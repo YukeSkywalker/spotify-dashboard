@@ -205,4 +205,50 @@ app.post('/api/player/queue', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Profilo utente
+app.get('/api/me', async (req, res) => {
+  try {
+    const token = await getAccessToken();
+    const { data } = await axios.get('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    res.json(data);
+  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
+});
+
+// Playlist
+app.get('/api/playlists', async (req, res) => {
+  try {
+    const token = await getAccessToken();
+    const { data } = await axios.get('https://api.spotify.com/v1/me/playlists?limit=50', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    res.json(data);
+  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
+});
+
+app.get('/api/top-tracks', async (req, res) => {
+  try {
+    const token = await getAccessToken();
+    const range = req.query.range || 'short_term';
+    const limit = req.query.limit || 10;
+    const { data } = await axios.get(`https://api.spotify.com/v1/me/top/tracks?limit=${limit}&time_range=${range}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    res.json(data);
+  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
+});
+
+app.get('/api/top-artists', async (req, res) => {
+  try {
+    const token = await getAccessToken();
+    const range = req.query.range || 'short_term';
+    const limit = req.query.limit || 10;
+    const { data } = await axios.get(`https://api.spotify.com/v1/me/top/artists?limit=${limit}&time_range=${range}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    res.json(data);
+  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
+});
+
 app.listen(PORT || 3000, () => console.log(`Server su porta ${PORT || 3000}`));
