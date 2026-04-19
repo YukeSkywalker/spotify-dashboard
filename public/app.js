@@ -88,7 +88,7 @@ async function init() {
 // ── USER PROFILE ──────────────────────────────────────
 async function loadUserProfile() {
   try {
-    const data = await fetch('/api/me').then(r => r.json());
+    const data = await apiFetch'/api/me').then(r => r.json());
     const el = document.getElementById('user-info');
     const img = data.images?.[0]?.url;
     const initial = (data.display_name || 'U')[0].toUpperCase();
