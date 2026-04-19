@@ -9,7 +9,6 @@
 </head>
 <body>
 
-  <!-- LOGIN PAGE -->
   <div id="login-page">
     <div class="login-box">
       <div class="login-logo">music<span>.</span>dashboard</div>
@@ -18,39 +17,37 @@
     </div>
   </div>
 
-  <!-- APP -->
   <div id="app" style="display:none">
-
     <aside class="sidebar">
       <div class="sidebar-logo">music<span>.</span>dashboard</div>
       <nav>
         <a class="nav-item active" data-section="dashboard">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          Dashboard
+          <span>Dashboard</span>
         </a>
         <a class="nav-item" data-section="player">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16"/></svg>
-          Player
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>
+          <span>Player</span>
         </a>
         <a class="nav-item" data-section="toptracks">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          Top Brani
+          <span>Top Brani</span>
         </a>
         <a class="nav-item" data-section="topartists">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Top Artisti
+          <span>Top Artisti</span>
         </a>
         <a class="nav-item" data-section="playlists">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-          Playlist
+          <span>Playlist</span>
         </a>
         <a class="nav-item" data-section="stats">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          Statistiche
+          <span>Statistiche</span>
         </a>
         <a class="nav-item" data-section="search">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          Ricerca
+          <span>Ricerca</span>
         </a>
       </nav>
       <div class="sidebar-footer">
@@ -64,11 +61,10 @@
 
     <main class="main-content">
 
-      <!-- DASHBOARD -->
       <section id="section-dashboard" class="section active">
         <h1 class="section-title">Dashboard</h1>
         <div class="stats-grid" id="stats-cards"></div>
-        <div class="grid-2">
+        <div class="grid-2" style="margin-bottom:1rem">
           <div class="card">
             <div class="card-label">In ascolto ora</div>
             <div id="now-playing-dash"></div>
@@ -90,21 +86,20 @@
         </div>
       </section>
 
-      <!-- PLAYER -->
       <section id="section-player" class="section">
         <h1 class="section-title">Player</h1>
         <div class="card player-card">
           <div id="now-playing-player"></div>
           <div class="player-controls">
             <button class="ctrl-btn" onclick="prevTrack()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="19,20 9,12 19,4"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="2" height="16"/></svg>
             </button>
             <button class="ctrl-btn play-btn" id="play-pause-btn" onclick="togglePlay()">
-              <svg id="icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-              <svg id="icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              <svg id="icon-play" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+              <svg id="icon-pause" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
             </button>
             <button class="ctrl-btn" onclick="nextTrack()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,4 15,12 5,20"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="17" y="4" width="2" height="16"/></svg>
             </button>
           </div>
           <div class="volume-row">
@@ -120,7 +115,6 @@
         </div>
       </section>
 
-      <!-- TOP BRANI -->
       <section id="section-toptracks" class="section">
         <h1 class="section-title">Top Brani</h1>
         <div class="timerange-tabs">
@@ -133,7 +127,6 @@
         </div>
       </section>
 
-      <!-- TOP ARTISTI -->
       <section id="section-topartists" class="section">
         <h1 class="section-title">Top Artisti</h1>
         <div class="timerange-tabs">
@@ -144,13 +137,11 @@
         <div class="artists-grid" id="full-top-artists"></div>
       </section>
 
-      <!-- PLAYLIST -->
       <section id="section-playlists" class="section">
-        <h1 class="section-title">Playlist</h1>
+        <h1 class="section-title">Le tue Playlist</h1>
         <div class="playlists-grid" id="playlists-grid"></div>
       </section>
 
-      <!-- STATISTICHE -->
       <section id="section-stats" class="section">
         <h1 class="section-title">Statistiche</h1>
         <div class="stats-grid" id="stats-cards-2"></div>
@@ -160,13 +151,12 @@
             <div id="genres-full"></div>
           </div>
           <div class="card">
-            <div class="card-label">Popolarità media artisti</div>
+            <div class="card-label">Popolarità artisti top</div>
             <div id="popularity-chart"></div>
           </div>
         </div>
       </section>
 
-      <!-- RICERCA -->
       <section id="section-search" class="section">
         <h1 class="section-title">Ricerca</h1>
         <div class="search-bar">
@@ -174,7 +164,9 @@
           <input type="text" id="search-input" placeholder="Cerca brani, artisti..." onkeydown="if(event.key==='Enter') searchTracks()"/>
           <button class="btn-search" onclick="searchTracks()">Cerca</button>
         </div>
-        <ol class="track-list track-list-full" id="search-results"></ol>
+        <div class="card" id="search-results-card" style="display:none">
+          <ol class="track-list track-list-full" id="search-results"></ol>
+        </div>
       </section>
 
     </main>
