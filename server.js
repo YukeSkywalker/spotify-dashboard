@@ -86,7 +86,9 @@ app.get('/api/token', async (req, res) => {
 app.get('/api/top-tracks', async (req, res) => {
   try {
     const token = await getAccessToken();
-    const { data } = await axios.get('https://api.spotify.com/v1/me/top/tracks?limit=10&time_range=short_term', {
+    const range = req.query.range || 'short_term';
+    const limit = req.query.limit || 10;
+    const { data } = await axios.get(`https://api.spotify.com/v1/me/top/tracks?limit=${limit}&time_range=${range}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     res.json(data);
@@ -96,7 +98,9 @@ app.get('/api/top-tracks', async (req, res) => {
 app.get('/api/top-artists', async (req, res) => {
   try {
     const token = await getAccessToken();
-    const { data } = await axios.get('https://api.spotify.com/v1/me/top/artists?limit=10&time_range=short_term', {
+    const range = req.query.range || 'short_term';
+    const limit = req.query.limit || 10;
+    const { data } = await axios.get(`https://api.spotify.com/v1/me/top/artists?limit=${limit}&time_range=${range}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     res.json(data);
@@ -221,30 +225,6 @@ app.get('/api/playlists', async (req, res) => {
   try {
     const token = await getAccessToken();
     const { data } = await axios.get('https://api.spotify.com/v1/me/playlists?limit=50', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    res.json(data);
-  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
-});
-
-app.get('/api/top-tracks', async (req, res) => {
-  try {
-    const token = await getAccessToken();
-    const range = req.query.range || 'short_term';
-    const limit = req.query.limit || 10;
-    const { data } = await axios.get(`https://api.spotify.com/v1/me/top/tracks?limit=${limit}&time_range=${range}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    res.json(data);
-  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
-});
-
-app.get('/api/top-artists', async (req, res) => {
-  try {
-    const token = await getAccessToken();
-    const range = req.query.range || 'short_term';
-    const limit = req.query.limit || 10;
-    const { data } = await axios.get(`https://api.spotify.com/v1/me/top/artists?limit=${limit}&time_range=${range}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     res.json(data);
