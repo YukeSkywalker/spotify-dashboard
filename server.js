@@ -63,10 +63,10 @@ app.get('/callback', async (req, res) => {
       expires_at: Date.now() + expires_in * 1000,
     };
     res.cookie('session_id', sessionId, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
     });
     console.log('Login OK, sessionId:', sessionId);
     res.redirect('/');
