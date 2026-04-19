@@ -411,3 +411,5 @@ async function init() {
   const res = await fetch('/api/token').then(r => r.json()).catch(() => ({}));
   if (res.token) initWebPlayer(res.token);
 }
+
+init();
