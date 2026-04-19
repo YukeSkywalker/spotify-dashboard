@@ -2,11 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
-const cookieParser = require('cookie-parser');
 
 const app = express();
 app.use(express.static('public'));
-app.use(cookieParser());
 
 const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, PORT } = process.env;
 
@@ -14,7 +12,6 @@ const tokens = {};
 
 app.get('/login', (req, res) => {
   const state = crypto.randomBytes(16).toString('hex');
-  res.cookie('oauth_state', state, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 60000 });
   const scope = [
     'user-read-currently-playing',
     'user-top-read',
@@ -62,14 +59,8 @@ app.get('/callback', async (req, res) => {
       refresh_token,
       expires_at: Date.now() + expires_in * 1000,
     };
-    res.cookie('session_id', sessionId, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
     console.log('Login OK, sessionId:', sessionId);
-    res.redirect('/');
+    res.redirect('/?session=' + sessionId);
   } catch (err) {
     console.error('Callback error:', err.response?.data || err.message);
     res.redirect('/?error=callback_failed');
@@ -77,7 +68,7 @@ app.get('/callback', async (req, res) => {
 });
 
 async function getAccessToken(req) {
-  const sessionId = req.cookies?.session_id;
+  const sessionId = req.headers['x-session-id'];
   if (!sessionId || !tokens[sessionId]) throw new Error('Non loggato');
   const store = tokens[sessionId];
   if (Date.now() < store.expires_at - 60000) return store.access_token;
@@ -100,7 +91,7 @@ async function getAccessToken(req) {
 }
 
 app.get('/api/auth-status', (req, res) => {
-  const sessionId = req.cookies?.session_id;
+  const sessionId = req.headers['x-session-id'];
   res.json({ loggedIn: !!(sessionId && tokens[sessionId]) });
 });
 
