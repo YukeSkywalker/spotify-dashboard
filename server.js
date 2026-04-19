@@ -1,5 +1,4 @@
 import express from "express";
-import fetch from "node-fetch";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import crypto from "crypto";
