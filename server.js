@@ -40,7 +40,13 @@ function requireAuth(req, res, next) {
 app.get("/login", (req, res) => {
   const state = generateRandomString(16);
 
-  const scope = "user-read-email user-top-read";
+  const scope = [
+    "user-read-email",
+    "user-top-read",
+    "user-read-playback-state",
+    "user-modify-playback-state",
+    "streaming"
+  ].join(" ");
 
   const url = new URL("https://accounts.spotify.com/authorize");
   url.searchParams.append("response_type", "code");
@@ -178,6 +184,73 @@ app.get("/logout", (req, res) => {
   sessions.delete(sessionId);
   res.clearCookie("session_id");
   res.redirect("/");
+});
+
+// PLAY
+app.put("/api/play", requireAuth, async (req, res) => {
+  const { uri } = req.body;
+
+  try {
+    await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/play", {
+      method: "PUT",
+      body: JSON.stringify({ uris: [uri] })
+    });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Play failed" });
+  }
+});
+
+// PAUSE
+app.put("/api/pause", requireAuth, async (req, res) => {
+  try {
+    await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/pause", {
+      method: "PUT"
+    });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Pause failed" });
+  }
+});
+
+// NEXT
+app.post("/api/next", requireAuth, async (req, res) => {
+  try {
+    await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/next", {
+      method: "POST"
+    });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Next failed" });
+  }
+});
+
+// CURRENT TRACK
+app.get("/api/current", requireAuth, async (req, res) => {
+  try {
+    const r = await spotifyFetch(
+      req.session,
+      "https://api.spotify.com/v1/me/player/currently-playing"
+    );
+    const data = await r.json();
+    res.json(data);
+  } catch {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+// TOP ARTISTS
+app.get("/api/top-artists", requireAuth, async (req, res) => {
+  try {
+    const r = await spotifyFetch(
+      req.session,
+      "https://api.spotify.com/v1/me/top/artists?limit=10"
+    );
+    const data = await r.json();
+    res.json(data);
+  } catch {
+    res.status(500).json({ error: "Failed" });
+  }
 });
 
 app.listen(PORT, () => {
