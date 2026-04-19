@@ -24,7 +24,7 @@ function generateRandomString(length) {
   return crypto.randomBytes(length).toString("hex");
 }
 
-// Middleware auth
+// AUTH MIDDLEWARE
 function requireAuth(req, res, next) {
   const sessionId = req.cookies.session_id;
   const session = sessions.get(sessionId);
@@ -49,6 +49,7 @@ app.get("/login", (req, res) => {
   ].join(" ");
 
   const url = new URL("https://accounts.spotify.com/authorize");
+
   url.searchParams.append("response_type", "code");
   url.searchParams.append("client_id", SPOTIFY_CLIENT_ID);
   url.searchParams.append("scope", scope);
@@ -121,30 +122,40 @@ async function refreshToken(session) {
 
   const data = await res.json();
 
-  session.access_token = data.access_token;
-  session.expires_at = Date.now() + data.expires_in * 1000;
+  if (data.access_token) {
+    session.access_token = data.access_token;
+    session.expires_at = Date.now() + data.expires_in * 1000;
+  }
 }
 
-// FETCH SPOTIFY CON AUTO REFRESH
-async function spotifyFetch(session, url) {
+// SPOTIFY FETCH COMPLETO
+async function spotifyFetch(session, url, options = {}) {
   if (Date.now() > session.expires_at) {
     await refreshToken(session);
   }
 
   const res = await fetch(url, {
+    ...options,
     headers: {
-      Authorization: "Bearer " + session.access_token
+      Authorization: "Bearer " + session.access_token,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
     }
   });
 
   if (res.status === 401) {
     await refreshToken(session);
 
-    return fetch(url, {
+    const retry = await fetch(url, {
+      ...options,
       headers: {
-        Authorization: "Bearer " + session.access_token
+        Authorization: "Bearer " + session.access_token,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
       }
     });
+
+    return retry;
   }
 
   return res;
@@ -153,10 +164,7 @@ async function spotifyFetch(session, url) {
 // API ME
 app.get("/api/me", requireAuth, async (req, res) => {
   try {
-    const r = await spotifyFetch(
-      req.session,
-      "https://api.spotify.com/v1/me"
-    );
+    const r = await spotifyFetch(req.session, "https://api.spotify.com/v1/me");
     const data = await r.json();
     res.json(data);
   } catch {
@@ -164,73 +172,12 @@ app.get("/api/me", requireAuth, async (req, res) => {
   }
 });
 
-// API TOP TRACKS
+// TOP TRACKS
 app.get("/api/top-tracks", requireAuth, async (req, res) => {
   try {
     const r = await spotifyFetch(
       req.session,
       "https://api.spotify.com/v1/me/top/tracks?limit=10"
-    );
-    const data = await r.json();
-    res.json(data);
-  } catch {
-    res.status(500).json({ error: "Failed to fetch tracks" });
-  }
-});
-
-// LOGOUT
-app.get("/logout", (req, res) => {
-  const sessionId = req.cookies.session_id;
-  sessions.delete(sessionId);
-  res.clearCookie("session_id");
-  res.redirect("/");
-});
-
-// PLAY
-app.put("/api/play", requireAuth, async (req, res) => {
-  const { uri } = req.body;
-
-  try {
-    await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/play", {
-      method: "PUT",
-      body: JSON.stringify({ uris: [uri] })
-    });
-    res.json({ success: true });
-  } catch {
-    res.status(500).json({ error: "Play failed" });
-  }
-});
-
-// PAUSE
-app.put("/api/pause", requireAuth, async (req, res) => {
-  try {
-    await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/pause", {
-      method: "PUT"
-    });
-    res.json({ success: true });
-  } catch {
-    res.status(500).json({ error: "Pause failed" });
-  }
-});
-
-// NEXT
-app.post("/api/next", requireAuth, async (req, res) => {
-  try {
-    await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/next", {
-      method: "POST"
-    });
-    res.json({ success: true });
-  } catch {
-    res.status(500).json({ error: "Next failed" });
-  }
-});
-
-// CURRENT TRACK
-app.get("/api/current", requireAuth, async (req, res) => {
-  try {
-    const r = await spotifyFetch(
-      req.session,
-      "https://api.spotify.com/v1/me/player/currently-playing"
     );
     const data = await r.json();
     res.json(data);
@@ -251,6 +198,71 @@ app.get("/api/top-artists", requireAuth, async (req, res) => {
   } catch {
     res.status(500).json({ error: "Failed" });
   }
+});
+
+// PLAY
+app.put("/api/play", requireAuth, async (req, res) => {
+  const { uri } = req.body;
+
+  try {
+    await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/play", {
+      method: "PUT",
+      body: JSON.stringify({ uris: [uri] })
+    });
+
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Play failed" });
+  }
+});
+
+// PAUSE
+app.put("/api/pause", requireAuth, async (req, res) => {
+  try {
+    await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/pause", {
+      method: "PUT"
+    });
+
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Pause failed" });
+  }
+});
+
+// NEXT
+app.post("/api/next", requireAuth, async (req, res) => {
+  try {
+    await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/next", {
+      method: "POST"
+    });
+
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Next failed" });
+  }
+});
+
+// CURRENT TRACK
+app.get("/api/current", requireAuth, async (req, res) => {
+  try {
+    const r = await spotifyFetch(
+      req.session,
+      "https://api.spotify.com/v1/me/player/currently-playing"
+    );
+
+    const data = await r.json();
+    res.json(data);
+  } catch {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+// LOGOUT
+app.get("/logout", (req, res) => {
+  const sessionId = req.cookies.session_id;
+  sessions.delete(sessionId);
+  res.clearCookie("session_id");
+  res.redirect("/");
 });
 
 app.listen(PORT, () => {
