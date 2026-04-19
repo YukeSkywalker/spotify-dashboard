@@ -2,8 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
-
 const fs = require('fs');
+
+const app = express();
+app.use(express.static('public'));
+
+const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, PORT } = process.env;
+
 const TOKEN_FILE = './tokens.json';
 
 function saveTokens(tokens) {
@@ -20,13 +25,6 @@ function loadTokens() {
 }
 
 let tokenStore = loadTokens();
-
-const app = express();
-app.use(express.static('public'));
-
-const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, PORT } = process.env;
-
-let tokenStore = {};
 
 app.get('/login', (req, res) => {
   const state = crypto.randomBytes(16).toString('hex');
@@ -69,9 +67,9 @@ app.get('/callback', async (req, res) => {
       }
     );
     const { access_token, refresh_token, expires_in } = response.data;
-        tokenStore = { access_token, refresh_token, expires_at: Date.now() + expires_in * 1000 };
-        saveTokens(tokenStore);
-        res.redirect('/');
+    tokenStore = { access_token, refresh_token, expires_at: Date.now() + expires_in * 1000 };
+    saveTokens(tokenStore);
+    res.redirect('/');
   } catch (err) {
     console.error(err.response?.data || err.message);
     res.status(500).send('Errore durante il login');
@@ -96,6 +94,7 @@ async function getAccessToken() {
   );
   tokenStore.access_token = response.data.access_token;
   tokenStore.expires_at = Date.now() + response.data.expires_in * 1000;
+  saveTokens(tokenStore);
   return tokenStore.access_token;
 }
 
