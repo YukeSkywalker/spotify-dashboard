@@ -1,18 +1,18 @@
 {
   "name": "spotify-oauth-app",
   "version": "1.0.0",
-  "description": "Spotify OAuth App",
+  "description": "Spotify OAuth App with full dashboard",
   "main": "server.js",
-  "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.0.0"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "dotenv": "^16.4.5",
-    "cookie-parser": "^1.4.6"
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "dotenv": "^16.3.1"
   }
 }
