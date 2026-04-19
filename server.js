@@ -69,12 +69,9 @@ app.get('/callback', async (req, res) => {
       }
     );
     const { access_token, refresh_token, expires_in } = response.data;
-    tokenStore = {
-      access_token,
-      refresh_token,
-      expires_at: Date.now() + expires_in * 1000,
-    };
-    res.redirect('/');
+        tokenStore = { access_token, refresh_token, expires_at: Date.now() + expires_in * 1000 };
+        saveTokens(tokenStore);
+        res.redirect('/');
   } catch (err) {
     console.error(err.response?.data || err.message);
     res.status(500).send('Errore durante il login');
