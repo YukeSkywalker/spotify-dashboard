@@ -3,17 +3,28 @@
 <head>
   <title>Spotify App</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </head>
 <body>
 
-  <h1>Spotify Dashboard</h1>
+<h1>Spotify Dashboard</h1>
 
-  <button id="loginBtn">Login with Spotify</button>
-  <button id="logoutBtn">Logout</button>
+<button id="loginBtn">Login</button>
+<button id="logoutBtn">Logout</button>
 
-  <div id="user"></div>
-  <div id="tracks"></div>
+<div id="user"></div>
 
-  <script src="app.js"></script>
+<div id="player">
+  <button id="play">▶️</button>
+  <button id="pause">⏸️</button>
+  <button id="next">⏭️</button>
+</div>
+
+<div id="current"></div>
+<div id="tracks"></div>
+<div id="artists"></div>
+<div id="minutes"></div>
+
+<script src="app.js"></script>
 </body>
 </html>
