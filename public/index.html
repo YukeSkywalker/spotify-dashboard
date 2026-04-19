@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spotify Dashboard</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+</head>
+<body>
+  <header>
+    <h1>🎵 Spotify Dashboard</h1>
+    <a href="/login" id="login-btn" class="btn-spotify" style="display:none">Accedi con Spotify</a>
+  </header>
+
+  <main id="dashboard" style="display:none">
+
+    <section id="player-section">
+      <h2>Player</h2>
+      <div id="now-playing"></div>
+      <div class="player-controls">
+        <button class="ctrl-btn" onclick="prevTrack()">⏮</button>
+        <button class="ctrl-btn play-btn" id="play-pause-btn" onclick="togglePlay()">▶</button>
+        <button class="ctrl-btn" onclick="nextTrack()">⏭</button>
+      </div>
+      <div class="volume-row">
+        <span>🔈</span>
+        <input type="range" id="volume-slider" min="0" max="100" value="80" oninput="setVolume(this.value)"/>
+        <span>🔊</span>
+      </div>
+      <div class="device-row">
+        <label for="device-select">Dispositivo:</label>
+        <select id="device-select" onchange="transferPlayback(this.value)"></select>
+        <button class="btn-small" onclick="loadDevices()">↻</button>
+      </div>
+    </section>
+
+    <section id="search-section">
+      <h2>Cerca brani</h2>
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="Cerca un brano..."
+               onkeydown="if(event.key==='Enter') searchTracks()"/>
+        <button class="btn-spotify" onclick="searchTracks()">Cerca</button>
+      </div>
+      <ol id="search-results"></ol>
+    </section>
+
+    <div class="two-col">
+      <section>
+        <h2>Top Brani</h2>
+        <ol id="top-tracks"></ol>
+      </section>
+      <section>
+        <h2>Top Artisti</h2>
+        <ol id="top-artists"></ol>
+      </section>
+    </div>
+
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
