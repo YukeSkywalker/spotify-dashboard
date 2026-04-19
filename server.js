@@ -1,39 +1,58 @@
 import express from "express";
 import dotenv from "dotenv";
 import crypto from "crypto";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
 const app = express();
-app.use(express.static("public"));
 app.use(express.json());
+app.use(cookieParser());
+app.use(express.static("public"));
 
 const PORT = process.env.PORT || 3000;
 
-// sessioni in memoria (ok per ora)
-const sessions = {};
+const {
+  SPOTIFY_CLIENT_ID,
+  SPOTIFY_CLIENT_SECRET,
+  SPOTIFY_REDIRECT_URI
+} = process.env;
 
-const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
-const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-const REDIRECT_URI = process.env.REDIRECT_URI;
+const sessions = new Map();
 
-// ================= LOGIN =================
+function generateRandomString(length) {
+  return crypto.randomBytes(length).toString("hex");
+}
+
+// Middleware auth
+function requireAuth(req, res, next) {
+  const sessionId = req.cookies.session_id;
+  const session = sessions.get(sessionId);
+
+  if (!session) return res.status(401).json({ error: "Not authenticated" });
+
+  req.session = session;
+  req.sessionId = sessionId;
+  next();
+}
+
+// LOGIN
 app.get("/login", (req, res) => {
-  const scope = "user-read-email user-read-private user-top-read";
+  const state = generateRandomString(16);
 
-  const url =
-    "https://accounts.spotify.com/authorize?" +
-    new URLSearchParams({
-      response_type: "code",
-      client_id: CLIENT_ID,
-      scope,
-      redirect_uri: REDIRECT_URI,
-    });
+  const scope = "user-read-email user-top-read";
 
-  res.redirect(url);
+  const url = new URL("https://accounts.spotify.com/authorize");
+  url.searchParams.append("response_type", "code");
+  url.searchParams.append("client_id", SPOTIFY_CLIENT_ID);
+  url.searchParams.append("scope", scope);
+  url.searchParams.append("redirect_uri", SPOTIFY_REDIRECT_URI);
+  url.searchParams.append("state", state);
+
+  res.redirect(url.toString());
 });
 
-// ================= CALLBACK =================
+// CALLBACK
 app.get("/callback", async (req, res) => {
   const code = req.query.code;
 
@@ -43,112 +62,124 @@ app.get("/callback", async (req, res) => {
       headers: {
         Authorization:
           "Basic " +
-          Buffer.from(CLIENT_ID + ":" + CLIENT_SECRET).toString("base64"),
-        "Content-Type": "application/x-www-form-urlencoded",
+          Buffer.from(
+            SPOTIFY_CLIENT_ID + ":" + SPOTIFY_CLIENT_SECRET
+          ).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded"
       },
       body: new URLSearchParams({
-        code,
-        redirect_uri: REDIRECT_URI,
         grant_type: "authorization_code",
-      }),
+        code,
+        redirect_uri: SPOTIFY_REDIRECT_URI
+      })
     });
 
     const data = await tokenRes.json();
 
-    if (!data.access_token) {
-      console.error(data);
-      return res.send("Errore token Spotify");
-    }
+    const sessionId = generateRandomString(24);
 
-    const sessionId = crypto.randomUUID();
-
-    sessions[sessionId] = {
+    sessions.set(sessionId, {
       access_token: data.access_token,
       refresh_token: data.refresh_token,
-      expires_at: Date.now() + data.expires_in * 1000,
-    };
+      expires_at: Date.now() + data.expires_in * 1000
+    });
 
-    console.log("LOGIN OK:", sessionId);
+    res.cookie("session_id", sessionId, {
+      httpOnly: true,
+      sameSite: "lax"
+    });
 
-    res.redirect("/?session=" + sessionId);
-
+    res.redirect("/");
   } catch (err) {
-    console.error(err);
-    res.send("Errore login");
+    res.status(500).send("Auth error");
   }
 });
 
-// ================= REFRESH TOKEN =================
-async function refreshToken(sessionId) {
-  const s = sessions[sessionId];
-
+// REFRESH TOKEN
+async function refreshToken(session) {
   const res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
       Authorization:
         "Basic " +
-        Buffer.from(CLIENT_ID + ":" + CLIENT_SECRET).toString("base64"),
-      "Content-Type": "application/x-www-form-urlencoded",
+        Buffer.from(
+          SPOTIFY_CLIENT_ID + ":" + SPOTIFY_CLIENT_SECRET
+        ).toString("base64"),
+      "Content-Type": "application/x-www-form-urlencoded"
     },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      refresh_token: s.refresh_token,
-    }),
+      refresh_token: session.refresh_token
+    })
   });
 
   const data = await res.json();
 
-  if (data.access_token) {
-    s.access_token = data.access_token;
-    s.expires_at = Date.now() + data.expires_in * 1000;
-  }
+  session.access_token = data.access_token;
+  session.expires_at = Date.now() + data.expires_in * 1000;
 }
 
-// ================= AUTH =================
-async function auth(req, res, next) {
-  const sessionId = req.headers["x-session-id"];
-
-  if (!sessionId || !sessions[sessionId]) {
-    return res.status(401).json({ error: "Non autorizzato" });
+// FETCH SPOTIFY CON AUTO REFRESH
+async function spotifyFetch(session, url) {
+  if (Date.now() > session.expires_at) {
+    await refreshToken(session);
   }
 
-  if (Date.now() > sessions[sessionId].expires_at) {
-    await refreshToken(sessionId);
+  const res = await fetch(url, {
+    headers: {
+      Authorization: "Bearer " + session.access_token
+    }
+  });
+
+  if (res.status === 401) {
+    await refreshToken(session);
+
+    return fetch(url, {
+      headers: {
+        Authorization: "Bearer " + session.access_token
+      }
+    });
   }
 
-  req.session = sessions[sessionId];
-  next();
+  return res;
 }
 
-// ================= LOGOUT =================
-app.post("/logout", (req, res) => {
-  const sessionId = req.headers["x-session-id"];
-  delete sessions[sessionId];
-  res.json({ ok: true });
+// API ME
+app.get("/api/me", requireAuth, async (req, res) => {
+  try {
+    const r = await spotifyFetch(
+      req.session,
+      "https://api.spotify.com/v1/me"
+    );
+    const data = await r.json();
+    res.json(data);
+  } catch {
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
 });
 
-// ================= API =================
-app.get("/api/me", auth, async (req, res) => {
-  const r = await fetch("https://api.spotify.com/v1/me", {
-    headers: {
-      Authorization: "Bearer " + req.session.access_token,
-    },
-  });
-
-  res.json(await r.json());
+// API TOP TRACKS
+app.get("/api/top-tracks", requireAuth, async (req, res) => {
+  try {
+    const r = await spotifyFetch(
+      req.session,
+      "https://api.spotify.com/v1/me/top/tracks?limit=10"
+    );
+    const data = await r.json();
+    res.json(data);
+  } catch {
+    res.status(500).json({ error: "Failed to fetch tracks" });
+  }
 });
 
-app.get("/api/top-tracks", auth, async (req, res) => {
-  const r = await fetch("https://api.spotify.com/v1/me/top/tracks", {
-    headers: {
-      Authorization: "Bearer " + req.session.access_token,
-    },
-  });
-
-  res.json(await r.json());
+// LOGOUT
+app.get("/logout", (req, res) => {
+  const sessionId = req.cookies.session_id;
+  sessions.delete(sessionId);
+  res.clearCookie("session_id");
+  res.redirect("/");
 });
 
-// ================= START =================
 app.listen(PORT, () => {
-  console.log("Server avviato su porta", PORT);
+  console.log("Server running on port " + PORT);
 });
