@@ -1,259 +1,167 @@
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
-const crypto = require('crypto');
+import express from "express";
+import fetch from "node-fetch";
+import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
+import crypto from "crypto";
+
+dotenv.config();
 
 const app = express();
-app.use(express.static('public'));
+app.use(express.json());
+app.use(cookieParser());
+app.use(express.static("public"));
 
-const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, PORT } = process.env;
+const PORT = process.env.PORT || 3000;
 
-const tokens = {};
+// ================= SESSION STORAGE =================
+const sessions = {};
 
-app.get('/login', (req, res) => {
-  const state = crypto.randomBytes(16).toString('hex');
-  const scope = [
-    'user-read-currently-playing',
-    'user-top-read',
-    'user-read-playback-state',
-    'user-modify-playback-state',
-    'streaming',
-    'user-read-email',
-    'user-read-private',
-    'playlist-read-private',
-    'playlist-read-collaborative',
-  ].join(' ');
-  const params = new URLSearchParams({
-    response_type: 'code',
-    client_id: SPOTIFY_CLIENT_ID,
-    scope,
-    redirect_uri: SPOTIFY_REDIRECT_URI,
-    state,
-  });
-  res.redirect(`https://accounts.spotify.com/authorize?${params}`);
+// ================= CONFIG =================
+const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+const REDIRECT_URI = process.env.REDIRECT_URI;
+
+// ================= LOGIN =================
+app.get("/login", (req, res) => {
+  const scope =
+    "user-read-private user-read-email user-top-read playlist-read-private";
+
+  const url =
+    "https://accounts.spotify.com/authorize?" +
+    new URLSearchParams({
+      response_type: "code",
+      client_id: CLIENT_ID,
+      scope,
+      redirect_uri: REDIRECT_URI,
+    });
+
+  res.redirect(url);
 });
 
-app.get('/callback', async (req, res) => {
-  const { code, error } = req.query;
-  if (error) return res.redirect('/?error=' + error);
-  if (!code) return res.redirect('/?error=no_code');
+// ================= CALLBACK =================
+app.get("/callback", async (req, res) => {
+  const code = req.query.code;
+
   try {
-    const response = await axios.post(
-      'https://accounts.spotify.com/api/token',
-      new URLSearchParams({
-        grant_type: 'authorization_code',
+    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        Authorization:
+          "Basic " +
+          Buffer.from(CLIENT_ID + ":" + CLIENT_SECRET).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
         code,
-        redirect_uri: SPOTIFY_REDIRECT_URI,
+        redirect_uri: REDIRECT_URI,
+        grant_type: "authorization_code",
       }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: `Basic ${Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64')}`,
-        },
-      }
-    );
-    const { access_token, refresh_token, expires_in } = response.data;
-    const sessionId = crypto.randomBytes(32).toString('hex');
-    tokens[sessionId] = {
-      access_token,
-      refresh_token,
-      expires_at: Date.now() + expires_in * 1000,
+    });
+
+    const data = await tokenRes.json();
+
+    if (!data.access_token) {
+      console.error(data);
+      return res.send("Errore token");
+    }
+
+    const sessionId = crypto.randomUUID();
+
+    sessions[sessionId] = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: Date.now() + data.expires_in * 1000,
     };
-    console.log('Login OK, sessionId:', sessionId);
-    res.redirect('/?session=' + sessionId);
+
+    console.log("LOGIN OK:", sessionId);
+
+    res.redirect("/?session=" + sessionId);
+
   } catch (err) {
-    console.error('Callback error:', err.response?.data || err.message);
-    res.redirect('/?error=callback_failed');
+    console.error(err);
+    res.send("Errore login");
   }
 });
 
-async function getAccessToken(req) {
-  const sessionId = req.headers['x-session-id'];
-  if (!sessionId || !tokens[sessionId]) throw new Error('Non loggato');
-  const store = tokens[sessionId];
-  if (Date.now() < store.expires_at - 60000) return store.access_token;
-  const response = await axios.post(
-    'https://accounts.spotify.com/api/token',
-    new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: store.refresh_token,
+// ================= REFRESH TOKEN =================
+async function refreshToken(sessionId) {
+  const s = sessions[sessionId];
+
+  const r = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      Authorization:
+        "Basic " +
+        Buffer.from(CLIENT_ID + ":" + CLIENT_SECRET).toString("base64"),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: s.refresh_token,
     }),
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64')}`,
-      },
-    }
-  );
-  store.access_token = response.data.access_token;
-  store.expires_at = Date.now() + response.data.expires_in * 1000;
-  return store.access_token;
+  });
+
+  const data = await r.json();
+
+  if (data.access_token) {
+    s.access_token = data.access_token;
+    s.expires_at = Date.now() + data.expires_in * 1000;
+  }
 }
 
-app.get('/api/auth-status', (req, res) => {
-  const sessionId = req.headers['x-session-id'];
-  res.json({ loggedIn: !!(sessionId && tokens[sessionId]) });
+// ================= AUTH =================
+async function auth(req, res, next) {
+  const sessionId = req.headers["x-session-id"];
+
+  if (!sessionId || !sessions[sessionId]) {
+    return res.status(401).json({ error: "Non autorizzato" });
+  }
+
+  const session = sessions[sessionId];
+
+  if (Date.now() > session.expires_at) {
+    await refreshToken(sessionId);
+  }
+
+  req.session = session;
+  next();
+}
+
+// ================= LOGOUT =================
+app.post("/logout", (req, res) => {
+  const sessionId = req.headers["x-session-id"];
+  delete sessions[sessionId];
+  res.json({ ok: true });
 });
 
-app.get('/api/token', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    res.json({ token });
-  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
+// ================= API =================
+
+// user
+app.get("/api/me", auth, async (req, res) => {
+  const r = await fetch("https://api.spotify.com/v1/me", {
+    headers: { Authorization: "Bearer " + req.session.access_token },
+  });
+  res.json(await r.json());
 });
 
-app.get('/api/me', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    const { data } = await axios.get('https://api.spotify.com/v1/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    res.json(data);
-  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
+// top tracks
+app.get("/api/top-tracks", auth, async (req, res) => {
+  const r = await fetch("https://api.spotify.com/v1/me/top/tracks", {
+    headers: { Authorization: "Bearer " + req.session.access_token },
+  });
+  res.json(await r.json());
 });
 
-app.get('/api/now-playing', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    const result = await axios.get('https://api.spotify.com/v1/me/player/currently-playing', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (result.status === 204 || !result.data) return res.json({ playing: false });
-    res.json({ playing: true, track: result.data.item, progress: result.data.progress_ms });
-  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
+// playlists
+app.get("/api/playlists", auth, async (req, res) => {
+  const r = await fetch("https://api.spotify.com/v1/me/playlists", {
+    headers: { Authorization: "Bearer " + req.session.access_token },
+  });
+  res.json(await r.json());
 });
 
-app.get('/api/top-tracks', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    const range = req.query.range || 'short_term';
-    const limit = req.query.limit || 10;
-    const { data } = await axios.get(
-      `https://api.spotify.com/v1/me/top/tracks?limit=${limit}&time_range=${range}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    res.json(data);
-  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
+// ================= START =================
+app.listen(PORT, () => {
+  console.log("Server avviato su", PORT);
 });
 
-app.get('/api/top-artists', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    const range = req.query.range || 'short_term';
-    const limit = req.query.limit || 10;
-    const { data } = await axios.get(
-      `https://api.spotify.com/v1/me/top/artists?limit=${limit}&time_range=${range}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    res.json(data);
-  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
-});
-
-app.get('/api/playlists', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    const { data } = await axios.get('https://api.spotify.com/v1/me/playlists?limit=50', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    res.json(data);
-  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
-});
-
-app.get('/api/devices', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    const { data } = await axios.get('https://api.spotify.com/v1/me/player/devices', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    res.json(data);
-  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
-});
-
-app.put('/api/player/transfer', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    await axios.put(
-      'https://api.spotify.com/v1/me/player',
-      { device_ids: [req.query.device_id], play: true },
-      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
-    );
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/player/play', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    await axios.put('https://api.spotify.com/v1/me/player/play', {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/player/pause', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    await axios.put('https://api.spotify.com/v1/me/player/pause', {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/player/next', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    await axios.post('https://api.spotify.com/v1/me/player/next', {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/player/previous', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    await axios.post('https://api.spotify.com/v1/me/player/previous', {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/player/volume', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    await axios.put(
-      `https://api.spotify.com/v1/me/player/volume?volume_percent=${req.query.volume}`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get('/api/search', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    const { data } = await axios.get(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(req.query.q)}&type=track&limit=20`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    res.json(data);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/player/queue', async (req, res) => {
-  try {
-    const token = await getAccessToken(req);
-    await axios.post(
-      `https://api.spotify.com/v1/me/player/queue?uri=${req.query.uri}`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.listen(PORT || 3000, () => console.log(`Server su porta ${PORT || 3000}`));
