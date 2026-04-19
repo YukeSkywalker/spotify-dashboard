@@ -2,16 +2,19 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 app.use(express.static('public'));
+app.use(cookieParser());
 
 const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, PORT } = process.env;
 
-let tokenStore = {};
+const tokens = {};
 
 app.get('/login', (req, res) => {
   const state = crypto.randomBytes(16).toString('hex');
+  res.cookie('oauth_state', state, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 60000 });
   const scope = [
     'user-read-currently-playing',
     'user-top-read',
@@ -35,13 +38,8 @@ app.get('/login', (req, res) => {
 
 app.get('/callback', async (req, res) => {
   const { code, error } = req.query;
-  if (error) {
-    console.error('Spotify error:', error);
-    return res.redirect('/?error=' + error);
-  }
-  if (!code) {
-    return res.redirect('/?error=no_code');
-  }
+  if (error) return res.redirect('/?error=' + error);
+  if (!code) return res.redirect('/?error=no_code');
   try {
     const response = await axios.post(
       'https://accounts.spotify.com/api/token',
@@ -58,12 +56,19 @@ app.get('/callback', async (req, res) => {
       }
     );
     const { access_token, refresh_token, expires_in } = response.data;
-    tokenStore = {
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    tokens[sessionId] = {
       access_token,
       refresh_token,
       expires_at: Date.now() + expires_in * 1000,
     };
-    console.log('Login OK, token salvato in memoria');
+    res.cookie('session_id', sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+    console.log('Login OK, sessionId:', sessionId);
     res.redirect('/');
   } catch (err) {
     console.error('Callback error:', err.response?.data || err.message);
@@ -71,14 +76,16 @@ app.get('/callback', async (req, res) => {
   }
 });
 
-async function getAccessToken() {
-  if (!tokenStore.access_token) throw new Error('Non loggato');
-  if (Date.now() < tokenStore.expires_at - 60000) return tokenStore.access_token;
+async function getAccessToken(req) {
+  const sessionId = req.cookies?.session_id;
+  if (!sessionId || !tokens[sessionId]) throw new Error('Non loggato');
+  const store = tokens[sessionId];
+  if (Date.now() < store.expires_at - 60000) return store.access_token;
   const response = await axios.post(
     'https://accounts.spotify.com/api/token',
     new URLSearchParams({
       grant_type: 'refresh_token',
-      refresh_token: tokenStore.refresh_token,
+      refresh_token: store.refresh_token,
     }),
     {
       headers: {
@@ -87,27 +94,26 @@ async function getAccessToken() {
       },
     }
   );
-  tokenStore.access_token = response.data.access_token;
-  tokenStore.expires_at = Date.now() + response.data.expires_in * 1000;
-  return tokenStore.access_token;
+  store.access_token = response.data.access_token;
+  store.expires_at = Date.now() + response.data.expires_in * 1000;
+  return store.access_token;
 }
 
 app.get('/api/auth-status', (req, res) => {
-  res.json({ loggedIn: !!tokenStore.access_token });
+  const sessionId = req.cookies?.session_id;
+  res.json({ loggedIn: !!(sessionId && tokens[sessionId]) });
 });
 
 app.get('/api/token', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     res.json({ token });
-  } catch (err) {
-    res.status(401).json({ error: 'Non autenticato' });
-  }
+  } catch (err) { res.status(401).json({ error: 'Non autenticato' }); }
 });
 
 app.get('/api/me', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     const { data } = await axios.get('https://api.spotify.com/v1/me', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -117,7 +123,7 @@ app.get('/api/me', async (req, res) => {
 
 app.get('/api/now-playing', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     const result = await axios.get('https://api.spotify.com/v1/me/player/currently-playing', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -128,7 +134,7 @@ app.get('/api/now-playing', async (req, res) => {
 
 app.get('/api/top-tracks', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     const range = req.query.range || 'short_term';
     const limit = req.query.limit || 10;
     const { data } = await axios.get(
@@ -141,7 +147,7 @@ app.get('/api/top-tracks', async (req, res) => {
 
 app.get('/api/top-artists', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     const range = req.query.range || 'short_term';
     const limit = req.query.limit || 10;
     const { data } = await axios.get(
@@ -154,7 +160,7 @@ app.get('/api/top-artists', async (req, res) => {
 
 app.get('/api/playlists', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     const { data } = await axios.get('https://api.spotify.com/v1/me/playlists?limit=50', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -164,7 +170,7 @@ app.get('/api/playlists', async (req, res) => {
 
 app.get('/api/devices', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     const { data } = await axios.get('https://api.spotify.com/v1/me/player/devices', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -174,7 +180,7 @@ app.get('/api/devices', async (req, res) => {
 
 app.put('/api/player/transfer', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     await axios.put(
       'https://api.spotify.com/v1/me/player',
       { device_ids: [req.query.device_id], play: true },
@@ -186,7 +192,7 @@ app.put('/api/player/transfer', async (req, res) => {
 
 app.post('/api/player/play', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     await axios.put('https://api.spotify.com/v1/me/player/play', {}, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -196,7 +202,7 @@ app.post('/api/player/play', async (req, res) => {
 
 app.post('/api/player/pause', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     await axios.put('https://api.spotify.com/v1/me/player/pause', {}, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -206,7 +212,7 @@ app.post('/api/player/pause', async (req, res) => {
 
 app.post('/api/player/next', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     await axios.post('https://api.spotify.com/v1/me/player/next', {}, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -216,7 +222,7 @@ app.post('/api/player/next', async (req, res) => {
 
 app.post('/api/player/previous', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     await axios.post('https://api.spotify.com/v1/me/player/previous', {}, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -226,7 +232,7 @@ app.post('/api/player/previous', async (req, res) => {
 
 app.post('/api/player/volume', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     await axios.put(
       `https://api.spotify.com/v1/me/player/volume?volume_percent=${req.query.volume}`,
       {},
@@ -238,7 +244,7 @@ app.post('/api/player/volume', async (req, res) => {
 
 app.get('/api/search', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     const { data } = await axios.get(
       `https://api.spotify.com/v1/search?q=${encodeURIComponent(req.query.q)}&type=track&limit=20`,
       { headers: { Authorization: `Bearer ${token}` } }
@@ -249,7 +255,7 @@ app.get('/api/search', async (req, res) => {
 
 app.post('/api/player/queue', async (req, res) => {
   try {
-    const token = await getAccessToken();
+    const token = await getAccessToken(req);
     await axios.post(
       `https://api.spotify.com/v1/me/player/queue?uri=${req.query.uri}`,
       {},
