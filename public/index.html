@@ -1,30 +1,212 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
-  <title>Spotify App</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Melodia — Your Spotify Universe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --green: #1DB954;
+      --green-dim: #158a3e;
+      --text: #f0ede8;
+      --muted: #7a7a8a;
+      --accent: #ff6b6b;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      overflow: hidden;
+    }
+
+    /* Animated background */
+    .bg-orbs {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.25;
+      animation: drift 12s ease-in-out infinite;
+    }
+    .orb-1 { width: 500px; height: 500px; background: #1DB954; top: -150px; left: -150px; animation-delay: 0s; }
+    .orb-2 { width: 400px; height: 400px; background: #6b2fff; top: 50%; right: -100px; animation-delay: -4s; }
+    .orb-3 { width: 300px; height: 300px; background: #ff6b6b; bottom: -100px; left: 40%; animation-delay: -8s; }
+
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -30px) scale(1.05); }
+      66% { transform: translate(-20px, 20px) scale(0.95); }
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .logo-mark {
+      width: 72px;
+      height: 72px;
+      background: var(--green);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 2rem;
+      box-shadow: 0 0 40px rgba(29,185,84,0.4);
+      animation: pulse-logo 3s ease-in-out infinite;
+    }
+    @keyframes pulse-logo {
+      0%, 100% { box-shadow: 0 0 40px rgba(29,185,84,0.4); }
+      50% { box-shadow: 0 0 70px rgba(29,185,84,0.6); }
+    }
+    .logo-mark svg { width: 40px; height: 40px; fill: #000; }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(3rem, 8vw, 6rem);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -2px;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #f0ede8 0%, #9a9a9a 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .tagline {
+      font-size: 1.15rem;
+      color: var(--muted);
+      font-weight: 300;
+      margin-bottom: 3rem;
+      max-width: 400px;
+      line-height: 1.7;
+    }
+
+    .login-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--green);
+      color: #000;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      padding: 1rem 2.5rem;
+      border-radius: 100px;
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 8px 30px rgba(29,185,84,0.35);
+    }
+    .login-btn:hover {
+      transform: translateY(-3px) scale(1.03);
+      box-shadow: 0 14px 40px rgba(29,185,84,0.5);
+      background: #22d662;
+    }
+    .login-btn svg { width: 22px; height: 22px; fill: #000; }
+
+    .error-msg {
+      margin-top: 1.5rem;
+      padding: 0.75rem 1.5rem;
+      background: rgba(255,107,107,0.15);
+      border: 1px solid rgba(255,107,107,0.3);
+      border-radius: 8px;
+      color: #ff9999;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .features {
+      position: absolute;
+      bottom: 2.5rem;
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .feature-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      padding: 0.4rem 1rem;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 100px;
+      background: rgba(255,255,255,0.03);
+    }
+    .feature-pill span { color: var(--green); }
+  </style>
 </head>
 <body>
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
 
-<h1>Spotify Dashboard</h1>
+  <main class="page">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.622.622 0 0 1 .207.857zm1.223-2.722a.779.779 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 0 1-.973-.517.779.779 0 0 1 .517-.972c3.632-1.102 8.147-.569 11.236 1.326a.779.779 0 0 1 .257 1.072zm.105-2.835C14.69 8.956 9.365 8.773 6.18 9.747a.935.935 0 1 1-.543-1.79c3.632-1.102 9.67-.89 13.48 1.401a.935.935 0 0 1-.203 1.71z"/>
+      </svg>
+    </div>
 
-<button id="loginBtn">Login</button>
-<button id="logoutBtn">Logout</button>
+    <h1>Melodia</h1>
+    <p class="tagline">Il tuo universo musicale Spotify. Statistiche, playlist, ricerca e riproduzione, tutto in un posto.</p>
 
-<div id="user"></div>
+    <a href="/login" class="login-btn">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.622.622 0 0 1 .207.857zm1.223-2.722a.779.779 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 0 1-.973-.517.779.779 0 0 1 .517-.972c3.632-1.102 8.147-.569 11.236 1.326a.779.779 0 0 1 .257 1.072zm.105-2.835C14.69 8.956 9.365 8.773 6.18 9.747a.935.935 0 1 1-.543-1.79c3.632-1.102 9.67-.89 13.48 1.401a.935.935 0 0 1-.203 1.71z"/>
+      </svg>
+      Accedi con Spotify
+    </a>
 
-<div id="player">
-  <button id="play">▶️</button>
-  <button id="pause">⏸️</button>
-  <button id="next">⏭️</button>
-</div>
+    <div class="error-msg" id="errorMsg"></div>
 
-<div id="current"></div>
-<div id="tracks"></div>
-<div id="artists"></div>
-<div id="minutes"></div>
+    <div class="features">
+      <div class="feature-pill"><span>♫</span> Top Tracks & Artists</div>
+      <div class="feature-pill"><span>⟳</span> Cronologia ascolti</div>
+      <div class="feature-pill"><span>◈</span> Playlist complete</div>
+      <div class="feature-pill"><span>⌕</span> Ricerca avanzata</div>
+      <div class="feature-pill"><span>▶</span> Riproduzione live</div>
+    </div>
+  </main>
 
-<script src="app.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    if (error) {
+      const el = document.getElementById('errorMsg');
+      const msgs = {
+        'access_denied': 'Hai negato l\'accesso a Spotify.',
+        'state_mismatch': 'Errore di sicurezza. Riprova.',
+        'token_exchange_failed': 'Errore durante il login. Riprova.',
+        'server_error': 'Errore del server. Riprova.'
+      };
+      el.textContent = msgs[error] || `Errore: ${error}`;
+      el.style.display = 'block';
+    }
+  </script>
 </body>
 </html>
