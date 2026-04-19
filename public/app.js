@@ -344,4 +344,37 @@ async function addToQueue(uri, btn) {
 }
 
 // ── START ─────────────────────────────────────────────
-init();
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('error')) {
+    console.error('Errore login:', params.get('error'));
+  }
+
+  const { loggedIn } = await fetch('/api/auth-status').then(r => r.json());
+
+  if (!loggedIn) {
+    document.getElementById('login-page').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  await Promise.all([
+    loadUserProfile(),
+    loadNowPlaying(),
+    loadDashTopTracks(),
+    loadDashTopArtists(),
+    loadFullTopTracks('short_term'),
+    loadFullTopArtists('short_term'),
+    loadPlaylists(),
+    loadStats(),
+    loadDevices(),
+  ]);
+
+  setInterval(loadNowPlaying, 5000);
+
+  const res = await fetch('/api/token').then(r => r.json()).catch(() => ({}));
+  if (res.token) initWebPlayer(res.token);
+}
