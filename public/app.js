@@ -1,5 +1,24 @@
 let isPlaying = false;
 
+// ── SESSION ───────────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const sessionFromUrl = params.get('session');
+if (sessionFromUrl) {
+  localStorage.setItem('session_id', sessionFromUrl);
+  window.history.replaceState({}, '', '/');
+}
+const SESSION_ID = localStorage.getItem('session_id');
+
+function apiFetch(url, options = {}) {
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      'x-session-id': SESSION_ID || '',
+    },
+  });
+}
+
 // ── THEME ─────────────────────────────────────────────
 const html = document.documentElement;
 const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -23,33 +42,47 @@ document.querySelectorAll('.nav-item').forEach(item => {
 
 // ── INIT ──────────────────────────────────────────────
 async function init() {
-  const { loggedIn } = await fetch('/api/auth-status').then(r => r.json());
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('error')) {
+      console.error('Errore login:', urlParams.get('error'));
+    }
 
-  if (!loggedIn) {
-    document.getElementById('login-page').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
-    return;
+    const res = await apiFetch('/api/auth-status');
+    console.log('Auth status HTTP:', res.status);
+    const { loggedIn } = await res.json();
+    console.log('Loggato:', loggedIn);
+    console.log('Session ID:', SESSION_ID);
+
+    if (!loggedIn) {
+      document.getElementById('login-page').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+
+    await Promise.all([
+      loadUserProfile(),
+      loadNowPlaying(),
+      loadDashTopTracks(),
+      loadDashTopArtists(),
+      loadFullTopTracks('short_term'),
+      loadFullTopArtists('short_term'),
+      loadPlaylists(),
+      loadStats(),
+      loadDevices(),
+    ]);
+
+    setInterval(loadNowPlaying, 5000);
+
+    const tokenRes = await apiFetch('/api/token').then(r => r.json()).catch(() => ({}));
+    if (tokenRes.token) initWebPlayer(tokenRes.token);
+
+  } catch (e) {
+    console.error('Errore init:', e);
   }
-
-  document.getElementById('login-page').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-
-  await Promise.all([
-    loadUserProfile(),
-    loadNowPlaying(),
-    loadDashTopTracks(),
-    loadDashTopArtists(),
-    loadFullTopTracks('short_term'),
-    loadFullTopArtists('short_term'),
-    loadPlaylists(),
-    loadStats(),
-    loadDevices(),
-  ]);
-
-  setInterval(loadNowPlaying, 5000);
-
-  const res = await fetch('/api/token').then(r => r.json()).catch(() => ({}));
-  if (res.token) initWebPlayer(res.token);
 }
 
 // ── USER PROFILE ──────────────────────────────────────
