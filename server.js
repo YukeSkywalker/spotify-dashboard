@@ -3,6 +3,24 @@ const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
 
+const fs = require('fs');
+const TOKEN_FILE = './tokens.json';
+
+function saveTokens(tokens) {
+  try { fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens)); } catch (e) {}
+}
+
+function loadTokens() {
+  try {
+    if (fs.existsSync(TOKEN_FILE)) {
+      return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return {};
+}
+
+let tokenStore = loadTokens();
+
 const app = express();
 app.use(express.static('public'));
 
