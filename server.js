@@ -1,28 +1,25 @@
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
-const crypto = require('crypto');
+import express from "express";
+import dotenv from "dotenv";
+import crypto from "crypto";
+
+dotenv.config();
 
 const app = express();
-app.use(express.static('public'));
-app.use(express.json());
-app.use(cookieParser());
 app.use(express.static("public"));
+app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// ================= SESSION STORAGE =================
+// sessioni in memoria (ok per ora)
 const sessions = {};
 
-// ================= CONFIG =================
 const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI;
 
 // ================= LOGIN =================
 app.get("/login", (req, res) => {
-  const scope =
-    "user-read-private user-read-email user-top-read playlist-read-private";
+  const scope = "user-read-email user-read-private user-top-read";
 
   const url =
     "https://accounts.spotify.com/authorize?" +
@@ -60,7 +57,7 @@ app.get("/callback", async (req, res) => {
 
     if (!data.access_token) {
       console.error(data);
-      return res.send("Errore token");
+      return res.send("Errore token Spotify");
     }
 
     const sessionId = crypto.randomUUID();
@@ -85,7 +82,7 @@ app.get("/callback", async (req, res) => {
 async function refreshToken(sessionId) {
   const s = sessions[sessionId];
 
-  const r = await fetch("https://accounts.spotify.com/api/token", {
+  const res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
       Authorization:
@@ -99,7 +96,7 @@ async function refreshToken(sessionId) {
     }),
   });
 
-  const data = await r.json();
+  const data = await res.json();
 
   if (data.access_token) {
     s.access_token = data.access_token;
@@ -115,13 +112,11 @@ async function auth(req, res, next) {
     return res.status(401).json({ error: "Non autorizzato" });
   }
 
-  const session = sessions[sessionId];
-
-  if (Date.now() > session.expires_at) {
+  if (Date.now() > sessions[sessionId].expires_at) {
     await refreshToken(sessionId);
   }
 
-  req.session = session;
+  req.session = sessions[sessionId];
   next();
 }
 
@@ -133,33 +128,27 @@ app.post("/logout", (req, res) => {
 });
 
 // ================= API =================
-
-// user
 app.get("/api/me", auth, async (req, res) => {
   const r = await fetch("https://api.spotify.com/v1/me", {
-    headers: { Authorization: "Bearer " + req.session.access_token },
+    headers: {
+      Authorization: "Bearer " + req.session.access_token,
+    },
   });
+
   res.json(await r.json());
 });
 
-// top tracks
 app.get("/api/top-tracks", auth, async (req, res) => {
   const r = await fetch("https://api.spotify.com/v1/me/top/tracks", {
-    headers: { Authorization: "Bearer " + req.session.access_token },
+    headers: {
+      Authorization: "Bearer " + req.session.access_token,
+    },
   });
-  res.json(await r.json());
-});
 
-// playlists
-app.get("/api/playlists", auth, async (req, res) => {
-  const r = await fetch("https://api.spotify.com/v1/me/playlists", {
-    headers: { Authorization: "Bearer " + req.session.access_token },
-  });
   res.json(await r.json());
 });
 
 // ================= START =================
 app.listen(PORT, () => {
-  console.log("Server avviato su", PORT);
+  console.log("Server avviato su porta", PORT);
 });
-
