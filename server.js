@@ -95,7 +95,8 @@ app.get("/callback", async (req, res) => {
 
     res.cookie("session_id", sid, {
       httpOnly: true,
-      sameSite: "lax"
+      secure: true,
+      sameSite: "none"
     });
 
     res.redirect("/app.html");
