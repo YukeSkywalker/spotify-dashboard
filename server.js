@@ -18,9 +18,9 @@ const {
   SPOTIFY_REDIRECT_URI
 } = process.env;
 
+// ================= SESSION (in memoria) =================
 const sessions = new Map();
 
-// ================= UTILS =================
 function generateId() {
   return crypto.randomBytes(24).toString("hex");
 }
@@ -30,10 +30,11 @@ function requireAuth(req, res, next) {
   const sid = req.cookies.session_id;
   const session = sessions.get(sid);
 
-  if (!session) return res.status(401).json({ error: "Unauthorized" });
+  if (!session) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
   req.session = session;
-  req.sid = sid;
   next();
 }
 
@@ -44,6 +45,8 @@ app.get("/login", (req, res) => {
     "user-top-read",
     "user-read-playback-state",
     "user-modify-playback-state",
+    "user-read-recently-played",
+    "playlist-read-private",
     "streaming"
   ].join(" ");
 
@@ -61,6 +64,10 @@ app.get("/login", (req, res) => {
 app.get("/callback", async (req, res) => {
   try {
     const code = req.query.code;
+
+    if (!code) {
+      return res.status(400).send("Missing code");
+    }
 
     const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
@@ -82,6 +89,7 @@ app.get("/callback", async (req, res) => {
     const data = await tokenRes.json();
 
     if (!data.access_token) {
+      console.error("TOKEN ERROR:", data);
       return res.status(400).send("Auth failed");
     }
 
@@ -99,35 +107,42 @@ app.get("/callback", async (req, res) => {
       sameSite: "none"
     });
 
-    res.redirect("/app.html");
+    res.redirect("/");
   } catch (err) {
+    console.error("CALLBACK ERROR:", err);
     res.status(500).send("Callback error");
   }
 });
 
 // ================= REFRESH =================
 async function refreshToken(session) {
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      Authorization:
-        "Basic " +
-        Buffer.from(
-          SPOTIFY_CLIENT_ID + ":" + SPOTIFY_CLIENT_SECRET
-        ).toString("base64"),
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: session.refresh_token
-    })
-  });
+  try {
+    const res = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        Authorization:
+          "Basic " +
+          Buffer.from(
+            SPOTIFY_CLIENT_ID + ":" + SPOTIFY_CLIENT_SECRET
+          ).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: session.refresh_token
+      })
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (data.access_token) {
-    session.access_token = data.access_token;
-    session.expires_at = Date.now() + data.expires_in * 1000;
+    if (data.access_token) {
+      session.access_token = data.access_token;
+      session.expires_at = Date.now() + data.expires_in * 1000;
+    } else {
+      console.error("REFRESH ERROR:", data);
+    }
+  } catch (err) {
+    console.error("REFRESH EXCEPTION:", err);
   }
 }
 
@@ -161,31 +176,26 @@ async function spotifyFetch(session, url, options = {}) {
   return res;
 }
 
-// ================= PLAYER DEVICE =================
-app.get("/api/device", requireAuth, async (req, res) => {
+// ================= DEVICE =================
+async function getDevice(session) {
   const r = await spotifyFetch(
-    req.session,
+    session,
     "https://api.spotify.com/v1/me/player/devices"
   );
-
   const data = await r.json();
-  res.json(data);
-});
+  return data.devices?.[0]?.id;
+}
 
-// ================= PLAY =================
+// ================= PLAYER =================
 app.put("/api/play", requireAuth, async (req, res) => {
   const { uri } = req.body;
 
-  const devices = await spotifyFetch(
-    req.session,
-    "https://api.spotify.com/v1/me/player/devices"
-  );
-
-  const d = await devices.json();
-  const deviceId = d.devices?.[0]?.id;
+  const deviceId = await getDevice(req.session);
 
   if (!deviceId) {
-    return res.status(400).json({ error: "No active device" });
+    return res
+      .status(400)
+      .json({ error: "Apri Spotify su telefono o PC prima" });
   }
 
   await spotifyFetch(
@@ -200,7 +210,6 @@ app.put("/api/play", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-// ================= OTHER CONTROLS =================
 app.put("/api/pause", requireAuth, async (req, res) => {
   await spotifyFetch(req.session, "https://api.spotify.com/v1/me/player/pause", {
     method: "PUT"
@@ -215,12 +224,13 @@ app.post("/api/next", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-// ================= DATA =================
+// ================= USER =================
 app.get("/api/me", requireAuth, async (req, res) => {
   const r = await spotifyFetch(req.session, "https://api.spotify.com/v1/me");
   res.json(await r.json());
 });
 
+// ================= TOP =================
 app.get("/api/top-tracks", requireAuth, async (req, res) => {
   const r = await spotifyFetch(
     req.session,
@@ -237,6 +247,41 @@ app.get("/api/top-artists", requireAuth, async (req, res) => {
   res.json(await r.json());
 });
 
+// ================= RECENT =================
+app.get("/api/recent", requireAuth, async (req, res) => {
+  const r = await spotifyFetch(
+    req.session,
+    "https://api.spotify.com/v1/me/player/recently-played?limit=20"
+  );
+  res.json(await r.json());
+});
+
+// ================= PLAYLIST =================
+app.get("/api/playlists", requireAuth, async (req, res) => {
+  const r = await spotifyFetch(
+    req.session,
+    "https://api.spotify.com/v1/me/playlists?limit=20"
+  );
+  res.json(await r.json());
+});
+
+// ================= SEARCH =================
+app.get("/api/search", requireAuth, async (req, res) => {
+  const q = req.query.q;
+
+  if (!q) return res.json({ tracks: { items: [] } });
+
+  const r = await spotifyFetch(
+    req.session,
+    `https://api.spotify.com/v1/search?q=${encodeURIComponent(
+      q
+    )}&type=track&limit=10`
+  );
+
+  res.json(await r.json());
+});
+
+// ================= CURRENT =================
 app.get("/api/current", requireAuth, async (req, res) => {
   const r = await spotifyFetch(
     req.session,
@@ -252,4 +297,7 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
-app.listen(PORT, () => console.log("RUNNING ON " + PORT));
+// ================= START =================
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
