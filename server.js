@@ -25,6 +25,8 @@ const SCOPES = [
   'streaming'
 ].join(' ');
 
+app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -35,6 +37,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000
   }
 }));
@@ -121,22 +124,35 @@ function requireAuth(req, res, next) {
 app.get('/login', (req, res) => {
   const state = generateRandomString(16);
   req.session.oauthState = state;
-  const params = new URLSearchParams({
-    response_type: 'code',
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    redirect_uri: REDIRECT_URI,
-    state: state,
-    show_dialog: 'false'
+  req.session.save((err) => {
+    if (err) {
+      console.error('Session save error:', err);
+      return res.redirect('/?error=server_error');
+    }
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      redirect_uri: REDIRECT_URI,
+      state: state,
+      show_dialog: 'false'
+    });
+    res.redirect(`https://accounts.spotify.com/authorize?${params.toString()}`);
   });
-  res.redirect(`https://accounts.spotify.com/authorize?${params.toString()}`);
 });
 
 app.get('/callback', async (req, res) => {
   const { code, state, error } = req.query;
+
   if (error) return res.redirect(`/?error=${encodeURIComponent(error)}`);
-  if (!state || state !== req.session.oauthState) return res.redirect('/?error=state_mismatch');
+
+  if (!state || !req.session.oauthState || state !== req.session.oauthState) {
+    console.error('State mismatch:', { received: state, expected: req.session.oauthState, sessionID: req.sessionID });
+    return res.redirect('/?error=state_mismatch');
+  }
+
   delete req.session.oauthState;
+
   try {
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -160,7 +176,13 @@ app.get('/callback', async (req, res) => {
     req.session.accessToken = tokenData.access_token;
     req.session.refreshToken = tokenData.refresh_token;
     req.session.tokenExpiry = Date.now() + (tokenData.expires_in * 1000);
-    res.redirect('/app');
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error after token:', err);
+        return res.redirect('/?error=server_error');
+      }
+      res.redirect('/app');
+    });
   } catch (err) {
     console.error('Callback error:', err);
     res.redirect('/?error=server_error');
