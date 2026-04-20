@@ -1,66 +1,16 @@
 <!DOCTYPE html>
-<html lang="it">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Spotify Dashboard</title>
+    <title>Melodia - Spotify Dash</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body>
-    <div id="login-screen" class="full-center">
-        <div class="login-card">
-            <i class="fab fa-spotify green"></i>
-            <h1>Spotify Dashboard</h1>
-            <button onclick="location.href='/login'" class="btn-spotify">LOG IN CON SPOTIFY</button>
-        </div>
+<body class="landing">
+    <div class="login-box">
+        <i class="fab fa-spotify fa-5x green"></i>
+        <h1>Melodia</h1>
+        <p>Dashboard avanzata per la tua musica</p>
+        <button onclick="location.href='/login'" class="btn-main">ACCEDI CON SPOTIFY</button>
     </div>
-
-    <div id="app" class="hidden main-layout">
-        <aside class="sidebar">
-            <div class="logo">DASHBOARD</div>
-            <nav id="menu">
-                <button class="nav-item active" onclick="showView('home')"><i class="fas fa-home"></i> Panoramica</button>
-                <button class="nav-item" onclick="showView('tracks')"><i class="fas fa-music"></i> Top Tracks</button>
-                <button class="nav-item" onclick="showView('artists')"><i class="fas fa-microphone"></i> Top Artists</button>
-                <button class="nav-item" onclick="showView('recent')"><i class="fas fa-history"></i> Recenti</button>
-                <button class="nav-item" onclick="showView('playlists')"><i class="fas fa-list"></i> Playlist</button>
-                <button class="nav-item" onclick="showView('search')"><i class="fas fa-search"></i> Cerca</button>
-                <button class="nav-item" onclick="showView('stats')"><i class="fas fa-chart-pie"></i> Statistiche</button>
-            </nav>
-            <div id="user-profile"></div>
-            <a href="/logout" class="btn-logout">Esci</a>
-        </aside>
-
-        <main class="content">
-            <div id="view-home" class="view">
-                <h1>Benvenuto</h1>
-                <div class="hero-grid">
-                    <div id="hero-track" class="card-hero"></div>
-                    <div id="hero-artist" class="card-hero"></div>
-                </div>
-            </div>
-            <div id="view-tracks" class="view hidden"><h1>Top Tracks</h1><div id="grid-tracks" class="grid"></div></div>
-            <div id="view-artists" class="view hidden"><h1>Top Artists</h1><div id="grid-artists" class="grid"></div></div>
-            <div id="view-recent" class="view hidden"><h1>Brani Recenti</h1><div id="grid-recent" class="grid"></div></div>
-            <div id="view-playlists" class="view hidden"><h1>Le tue Playlist</h1><div id="grid-playlists" class="grid"></div></div>
-            <div id="view-search" class="view hidden">
-                <h1>Cerca</h1>
-                <input type="text" id="search-bar" placeholder="Cerca canzoni o artisti..." oninput="doSearch(this.value)">
-                <div id="grid-search" class="grid"></div>
-            </div>
-            <div id="view-stats" class="view hidden"><h1>Le tue Statistiche</h1><div id="stats-container" class="grid"></div></div>
-        </main>
-
-        <footer class="player">
-            <div id="player-track" class="player-info">Nessun device rilevato</div>
-            <div class="player-controls">
-                <button onclick="control('pause')"><i class="fas fa-pause"></i></button>
-                <button onclick="control('play')"><i class="fas fa-play"></i></button>
-                <button onclick="control('next')"><i class="fas fa-step-forward"></i></button>
-            </div>
-            <div class="player-status"><i class="fas fa-check-circle"></i> Spotify Connect</div>
-        </footer>
-    </div>
-    <script src="app.js"></script>
 </body>
 </html>
