@@ -1,398 +1,85 @@
-require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-const crypto = require('crypto');
-const path = require('path');
+require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
-// ─── Config ──────────────────────────────────────────────────────────────────
-const CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
-const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-const REDIRECT_URI = process.env.REDIRECT_URI || `http://localhost:${PORT}/callback`;
-const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-
-const SCOPES = [
-  'user-read-private',
-  'user-read-email',
-  'user-top-read',
-  'user-read-recently-played',
-  'user-read-playback-state',
-  'user-modify-playback-state',
-  'user-read-currently-playing',
-  'playlist-read-private',
-  'playlist-read-collaborative',
-  'streaming'
-].join(' ');
-
-// ─── Middleware ───────────────────────────────────────────────────────────────
+app.set('trust proxy', 1);
+app.use(express.static('public'));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-
 app.use(session({
-  secret: SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-  }
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: true, sameSite: 'none', maxAge: 3600000 }
 }));
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function generateRandomString(length) {
-  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
-}
+const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, REDIRECT_URI } = process.env;
 
-async function refreshAccessToken(session) {
-  if (!session.refreshToken) throw new Error('No refresh token');
-
-  const params = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: session.refreshToken
-  });
-
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')
-    },
-    body: params.toString()
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Token refresh failed: ${err}`);
-  }
-
-  const data = await response.json();
-  session.accessToken = data.access_token;
-  session.tokenExpiry = Date.now() + (data.expires_in * 1000);
-  if (data.refresh_token) session.refreshToken = data.refresh_token;
-
-  return session.accessToken;
-}
-
-async function getValidToken(session) {
-  if (!session.accessToken) throw new Error('Not authenticated');
-  if (Date.now() > (session.tokenExpiry - 60000)) {
-    return await refreshAccessToken(session);
-  }
-  return session.accessToken;
-}
-
-async function spotifyFetch(url, session, options = {}) {
-  const token = await getValidToken(session);
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
+// Helper per fetch con refresh token
+async function spotifyFetch(url, req, options = {}) {
+    if (Date.now() > req.session.expires_at) {
+        const response = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
+            },
+            body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: req.session.refresh_token })
+        });
+        const data = await response.json();
+        req.session.access_token = data.access_token;
+        req.session.expires_at = Date.now() + (data.expires_in * 1000);
     }
-  });
-
-  if (response.status === 401) {
-    // Try refresh once
-    const newToken = await refreshAccessToken(session);
-    const retry = await fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${newToken}`,
-        'Content-Type': 'application/json',
-        ...(options.headers || {})
-      }
+    const res = await fetch(url, {
+        ...options,
+        headers: { ...options.headers, 'Authorization': `Bearer ${req.session.access_token}`, 'Content-Type': 'application/json' }
     });
-    if (!retry.ok) {
-      if (retry.status === 204) return null;
-      const err = await retry.text();
-      throw new Error(`Spotify API error ${retry.status}: ${err}`);
-    }
-    if (retry.status === 204) return null;
-    return retry.json();
-  }
-
-  if (!response.ok) {
-    if (response.status === 204) return null;
-    const err = await response.text();
-    throw new Error(`Spotify API error ${response.status}: ${err}`);
-  }
-  if (response.status === 204) return null;
-  return response.json();
+    return res.status === 204 ? null : res.json();
 }
 
-function requireAuth(req, res, next) {
-  if (!req.session.accessToken) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  next();
-}
-
-// ─── Auth Routes ──────────────────────────────────────────────────────────────
+// AUTH ROUTES
 app.get('/login', (req, res) => {
-  const state = generateRandomString(16);
-  req.session.oauthState = state;
-
-  const params = new URLSearchParams({
-    response_type: 'code',
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    redirect_uri: REDIRECT_URI,
-    state: state,
-    show_dialog: 'false'
-  });
-
-  res.redirect(`https://accounts.spotify.com/authorize?${params.toString()}`);
+    const scopes = 'user-read-private user-read-email user-top-read user-read-recently-played playlist-read-private user-modify-playback-state user-read-playback-state';
+    res.redirect(`https://accounts.spotify.com/authorize?response_type=code&client_id=${SPOTIFY_CLIENT_ID}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`);
 });
 
 app.get('/callback', async (req, res) => {
-  const { code, state, error } = req.query;
-
-  if (error) {
-    return res.redirect(`/?error=${encodeURIComponent(error)}`);
-  }
-
-  if (!state || state !== req.session.oauthState) {
-    return res.redirect('/?error=state_mismatch');
-  }
-
-  delete req.session.oauthState;
-
-  try {
-    const params = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code: code,
-      redirect_uri: REDIRECT_URI
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
+        },
+        body: new URLSearchParams({ grant_type: 'authorization_code', code: req.query.code, redirect_uri: REDIRECT_URI })
     });
-
-    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic ' + Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')
-      },
-      body: params.toString()
-    });
-
-    if (!tokenResponse.ok) {
-      const err = await tokenResponse.text();
-      console.error('Token exchange failed:', err);
-      return res.redirect('/?error=token_exchange_failed');
-    }
-
-    const tokenData = await tokenResponse.json();
-    req.session.accessToken = tokenData.access_token;
-    req.session.refreshToken = tokenData.refresh_token;
-    req.session.tokenExpiry = Date.now() + (tokenData.expires_in * 1000);
-
-    res.redirect('/app');
-  } catch (err) {
-    console.error('Callback error:', err);
-    res.redirect('/?error=server_error');
-  }
-});
-
-app.get('/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) console.error('Session destroy error:', err);
+    const data = await response.json();
+    req.session.access_token = data.access_token;
+    req.session.refresh_token = data.refresh_token;
+    req.session.expires_at = Date.now() + (data.expires_in * 1000);
     res.redirect('/');
-  });
 });
 
-// ─── Auth Status ──────────────────────────────────────────────────────────────
-app.get('/api/auth/status', (req, res) => {
-  res.json({ authenticated: !!req.session.accessToken });
-});
+app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// ─── API Routes ───────────────────────────────────────────────────────────────
-app.get('/api/me', requireAuth, async (req, res) => {
-  try {
-    const data = await spotifyFetch('https://api.spotify.com/v1/me', req.session);
-    res.json(data);
-  } catch (err) {
-    console.error('/api/me error:', err.message);
-    if (err.message.includes('Not authenticated') || err.message.includes('401')) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-    res.status(500).json({ error: err.message });
-  }
-});
+// API ENDPOINTS
+const checkAuth = (req, res, next) => req.session.access_token ? next() : res.status(401).send();
 
-app.get('/api/top-tracks', requireAuth, async (req, res) => {
-  try {
-    const { time_range = 'medium_term', limit = 20 } = req.query;
-    const data = await spotifyFetch(
-      `https://api.spotify.com/v1/me/top/tracks?time_range=${time_range}&limit=${limit}`,
-      req.session
-    );
-    res.json(data);
-  } catch (err) {
-    console.error('/api/top-tracks error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
+app.get('/api/auth-check', (req, res) => res.json({ authenticated: !!req.session.access_token }));
+app.get('/api/me', checkAuth, async (req, res) => res.json(await spotifyFetch('https://api.spotify.com/v1/me', req)));
+app.get('/api/top-tracks', checkAuth, async (req, res) => res.json((await spotifyFetch('https://api.spotify.com/v1/me/top/tracks?limit=30', req)).items));
+app.get('/api/top-artists', checkAuth, async (req, res) => res.json((await spotifyFetch('https://api.spotify.com/v1/me/top/artists?limit=20', req)).items));
+app.get('/api/recent', checkAuth, async (req, res) => res.json((await spotifyFetch('https://api.spotify.com/v1/me/player/recently-played?limit=20', req)).items));
+app.get('/api/playlists', checkAuth, async (req, res) => res.json((await spotifyFetch('https://api.spotify.com/v1/me/playlists?limit=20', req)).items));
+app.get('/api/current', checkAuth, async (req, res) => res.json(await spotifyFetch('https://api.spotify.com/v1/me/player/currently-playing', req)));
+app.get('/api/search', checkAuth, async (req, res) => res.json(await spotifyFetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(req.query.q)}&type=track,artist&limit=15`, req)));
 
-app.get('/api/top-artists', requireAuth, async (req, res) => {
-  try {
-    const { time_range = 'medium_term', limit = 20 } = req.query;
-    const data = await spotifyFetch(
-      `https://api.spotify.com/v1/me/top/artists?time_range=${time_range}&limit=${limit}`,
-      req.session
-    );
-    res.json(data);
-  } catch (err) {
-    console.error('/api/top-artists error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/recently-played', requireAuth, async (req, res) => {
-  try {
-    const { limit = 50 } = req.query;
-    const data = await spotifyFetch(
-      `https://api.spotify.com/v1/me/player/recently-played?limit=${limit}`,
-      req.session
-    );
-    res.json(data);
-  } catch (err) {
-    console.error('/api/recently-played error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/playlists', requireAuth, async (req, res) => {
-  try {
-    const { limit = 50 } = req.query;
-    const data = await spotifyFetch(
-      `https://api.spotify.com/v1/me/playlists?limit=${limit}`,
-      req.session
-    );
-    res.json(data);
-  } catch (err) {
-    console.error('/api/playlists error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/search', requireAuth, async (req, res) => {
-  try {
-    const { q, type = 'track', limit = 20 } = req.query;
-    if (!q) return res.status(400).json({ error: 'Query parameter required' });
-    const data = await spotifyFetch(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=${type}&limit=${limit}`,
-      req.session
-    );
-    res.json(data);
-  } catch (err) {
-    console.error('/api/search error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/player', requireAuth, async (req, res) => {
-  try {
-    const data = await spotifyFetch(
-      'https://api.spotify.com/v1/me/player',
-      req.session
-    );
-    res.json(data || { is_playing: false });
-  } catch (err) {
-    console.error('/api/player error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put('/api/player/play', requireAuth, async (req, res) => {
-  try {
-    const body = req.body;
-    await spotifyFetch('https://api.spotify.com/v1/me/player/play', req.session, {
-      method: 'PUT',
-      body: JSON.stringify(body)
-    });
+app.post('/api/play', checkAuth, async (req, res) => {
+    await spotifyFetch('https://api.spotify.com/v1/me/player/play', req, { method: 'PUT', body: JSON.stringify({ uris: [req.body.uri] }) });
     res.json({ success: true });
-  } catch (err) {
-    console.error('/api/player/play error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
 });
+app.post('/api/pause', checkAuth, async (req, res) => { await spotifyFetch('https://api.spotify.com/v1/me/player/pause', req, { method: 'PUT' }); res.json({ success: true }); });
+app.post('/api/next', checkAuth, async (req, res) => { await spotifyFetch('https://api.spotify.com/v1/me/player/next', req, { method: 'POST' }); res.json({ success: true }); });
 
-app.post('/api/player/pause', requireAuth, async (req, res) => {
-  try {
-    await spotifyFetch('https://api.spotify.com/v1/me/player/pause', req.session, {
-      method: 'PUT'
-    });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/player/next', requireAuth, async (req, res) => {
-  try {
-    await spotifyFetch('https://api.spotify.com/v1/me/player/next', req.session, {
-      method: 'POST'
-    });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/player/previous', requireAuth, async (req, res) => {
-  try {
-    await spotifyFetch('https://api.spotify.com/v1/me/player/previous', req.session, {
-      method: 'POST'
-    });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put('/api/player/volume', requireAuth, async (req, res) => {
-  try {
-    const { volume_percent } = req.body;
-    await spotifyFetch(
-      `https://api.spotify.com/v1/me/player/volume?volume_percent=${volume_percent}`,
-      req.session,
-      { method: 'PUT' }
-    );
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/playlist/:id/tracks', requireAuth, async (req, res) => {
-  try {
-    const data = await spotifyFetch(
-      `https://api.spotify.com/v1/playlists/${req.params.id}/tracks?limit=50`,
-      req.session
-    );
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─── SPA Routing ──────────────────────────────────────────────────────────────
-app.get('/app', (req, res) => {
-  if (!req.session.accessToken) return res.redirect('/');
-  res.sendFile(path.join(__dirname, 'public', 'app.html'));
-});
-
-app.get('/', (req, res) => {
-  if (req.session.accessToken) return res.redirect('/app');
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// ─── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  if (!CLIENT_ID || !CLIENT_SECRET) {
-    console.warn('⚠️  WARNING: SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET not set!');
-  }
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
