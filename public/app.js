@@ -45,19 +45,13 @@ async function api(url, options = {}) {
 }
 
 // ================= USER =================
-aasync function loadUser() {
+async function loadUser() {
   const user = await api("/api/me");
-
-  if (!user) {
-    userDiv.innerHTML = "<p>Non autenticato</p>";
-    return false;
-  }
+  if (!user) return;
 
   userDiv.innerHTML = `
     <h2>${user.display_name}</h2>
   `;
-
-  return true;
 }
 
 // ================= PANORAMICA =================
