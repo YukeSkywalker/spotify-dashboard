@@ -1,96 +1,100 @@
+async function spotifyApi(url, method = 'GET', body = null) {
+    const opts = { method };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    if (res.status === 401) window.location.href = '/';
+    return res.json();
+}
+
 async function init() {
-    const { authenticated } = await fetch('/api/auth-check').then(r => r.json());
-    if (authenticated) {
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-        loadUser();
-        showView('home');
-        setInterval(updatePlayer, 3000);
-    }
+    const user = await spotifyApi('/api/me');
+    document.getElementById('user-display').innerHTML = `<img src="${user.images[0]?.url || ''}" style="width:30px; border-radius:50%; margin-right:10px"> ${user.display_name}`;
+    loadOverview();
+    startPolling();
 }
 
-async function loadUser() {
-    const user = await fetch('/api/me').then(r => r.json());
-    document.getElementById('user-profile').innerHTML = `<p style="color:var(--green)">● ${user.display_name}</p>`;
-}
-
-async function showView(viewId) {
+function switchTab(tabId) {
     document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-    document.getElementById(`view-${viewId}`).classList.remove('hidden');
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.getElementById(tabId).classList.remove('hidden');
+    event.currentTarget.classList.add('active');
     
-    // Trova il bottone cliccato e aggiungi active
-    const btns = document.querySelectorAll('.nav-item');
-    btns.forEach(b => { if(b.getAttribute('onclick').includes(viewId)) b.classList.add('active'); });
-
-    if (viewId === 'home') loadHome();
-    if (viewId === 'tracks') renderGrid('/api/top-tracks', 'grid-tracks', 'track');
-    if (viewId === 'artists') renderGrid('/api/top-artists', 'grid-artists', 'artist');
-    if (viewId === 'recent') renderGrid('/api/recent', 'grid-recent', 'recent');
-    if (viewId === 'playlists') renderGrid('/api/playlists', 'grid-playlists', 'playlist');
-    if (viewId === 'stats') loadStats();
+    if (tabId === 'top-tracks') loadGrid('/api/top-tracks', 'grid-tracks', 'track');
+    if (tabId === 'top-artists') loadGrid('/api/top-artists', 'grid-artists', 'artist');
+    if (tabId === 'recent') loadGrid('/api/recent', 'grid-recent', 'recent');
+    if (tabId === 'playlists') loadGrid('/api/playlists', 'grid-playlists', 'playlist');
+    if (tabId === 'stats') loadStats();
 }
 
-async function renderGrid(url, containerId, type) {
-    const data = await fetch(url).then(r => r.json());
-    const container = document.getElementById(containerId);
-    container.innerHTML = data.map(item => {
-        const obj = type === 'recent' ? item.track : item;
-        const img = (type === 'artist') ? obj.images[0]?.url : (obj.album?.images[0]?.url || obj.images?.[0]?.url);
-        return `
-            <div class="card" onclick="play('${obj.uri}')">
-                <img src="${img || ''}">
-                <h4>${obj.name}</h4>
-                <p>${type === 'artist' ? 'Artista' : (obj.artists?.[0]?.name || 'Playlist')}</p>
-            </div>
-        `;
-    }).join('');
+async function loadOverview() {
+    const tracks = await spotifyApi('/api/top-tracks');
+    const artists = await spotifyApi('/api/top-artists');
+    
+    if(tracks[0]) document.getElementById('best-track').innerHTML = `<h3>La tua traccia preferita</h3><img src="${tracks[0].album.images[0].url}" style="width:100px; border-radius:4px"><p>${tracks[0].name}</p>`;
+    if(artists[0]) document.getElementById('best-artist').innerHTML = `<h3>Il tuo artista top</h3><img src="${artists[0].images[0].url}" style="width:100px; border-radius:4px"><p>${artists[0].name}</p>`;
 }
 
-async function loadHome() {
-    const tracks = await fetch('/api/top-tracks').then(r => r.json());
-    const artists = await fetch('/api/top-artists').then(r => r.json());
-    if(tracks[0]) document.getElementById('hero-track').innerHTML = `<h3>TOP TRACK</h3><h2>${tracks[0].name}</h2><p>${tracks[0].artists[0].name}</p>`;
-    if(artists[0]) document.getElementById('hero-artist').innerHTML = `<h3>TOP ARTIST</h3><h2>${artists[0].name}</h2><p>Il tuo preferito</p>`;
-}
-
-async function loadStats() {
-    const tracks = await fetch('/api/top-tracks').then(r => r.json());
-    const cont = document.getElementById('stats-container');
-    cont.innerHTML = `
-        <div class="card"><h2>${tracks.length}</h2><p>Brani Analizzati</p></div>
-        <div class="card"><h2>${Math.floor(tracks.length * 3.5)}</h2><p>Minuti Stimati</p></div>
-        <div class="card"><h2>Premium</h2><p>Status Account</p></div>
-    `;
-}
-
-async function doSearch(q) {
-    if (q.length < 3) return;
-    const data = await fetch(`/api/search?q=${q}`).then(r => r.json());
-    document.getElementById('grid-search').innerHTML = data.tracks.items.map(t => `
-        <div class="card" onclick="play('${t.uri}')">
-            <img src="${t.album.images[0].url}">
-            <h4>${t.name}</h4><p>${t.artists[0].name}</p>
+async function loadGrid(url, containerId, type) {
+    const data = await spotifyApi(url);
+    const items = type === 'recent' ? data.map(d => d.track) : data;
+    document.getElementById(containerId).innerHTML = items.map(i => `
+        <div class="card" onclick="playTrack('${i.uri}')">
+            <img src="${(type === 'artist' ? i.images[0]?.url : i.album?.images[0]?.url) || ''}">
+            <h4>${i.name}</h4>
+            <p>${i.artists ? i.artists[0].name : (i.owner ? 'di ' + i.owner.display_name : '')}</p>
         </div>
     `).join('');
 }
 
-async function play(uri) { 
-    await fetch('/api/play', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ uri }) });
-    setTimeout(updatePlayer, 500);
+async function loadStats() {
+    const tracks = await spotifyApi('/api/top-tracks');
+    const popularity = Math.round(tracks.reduce((acc, t) => acc + t.popularity, 0) / tracks.length);
+    document.getElementById('stats-content').innerHTML = `
+        <div class="hero-card"><h2>Popolarità Media</h2><h1 class="green">${popularity}%</h1><p>Quanto è mainstream la tua musica?</p></div>
+        <div class="hero-card"><h2>Brani Analizzati</h2><h1 class="green">${tracks.length}</h1><p>Dati basati sugli ultimi 6 mesi</p></div>
+    `;
 }
 
-async function control(cmd) { 
-    await fetch(`/api/${cmd}`, { method: 'POST' }); 
+async function playTrack(uri) {
+    const res = await fetch('/api/play', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ uri }) });
+    const data = await res.json();
+    if (data.error) alert(data.error);
+}
+
+async function playerAction(action) {
+    await fetch(`/api/${action}`, { method: 'POST' });
     setTimeout(updatePlayer, 500);
 }
 
 async function updatePlayer() {
-    const data = await fetch('/api/current').then(r => r.status === 204 ? null : r.json());
-    const info = document.getElementById('player-track');
+    const data = await spotifyApi('/api/current');
+    const container = document.getElementById('now-playing');
     if (data && data.item) {
-        info.innerHTML = `<img src="${data.item.album.images[0].url}"><div><b>${data.item.name}</b><br><small>${data.item.artists[0].name}</small></div>`;
+        container.innerHTML = `<img src="${data.item.album.images[0].url}"><div><b>${data.item.name}</b><br><small>${data.item.artists[0].name}</small></div>`;
+    } else {
+        container.innerHTML = "Nessun brano in riproduzione";
     }
+}
+
+let searchTimer;
+function handleSearch(q) {
+    clearTimeout(searchTimer);
+    if (q.length < 2) return;
+    searchTimer = setTimeout(async () => {
+        const data = await spotifyApi(`/api/search?q=${q}`);
+        document.getElementById('grid-search').innerHTML = data.tracks.items.map(i => `
+            <div class="card" onclick="playTrack('${i.uri}')">
+                <img src="${i.album.images[0].url}">
+                <h4>${i.name}</h4>
+                <p>${i.artists[0].name}</p>
+            </div>
+        `).join('');
+    }, 500);
+}
+
+function startPolling() {
+    updatePlayer();
+    setInterval(updatePlayer, 5000);
 }
 
 init();
