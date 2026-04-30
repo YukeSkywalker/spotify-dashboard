@@ -253,7 +253,7 @@ async function openPlaylist(id, name, img, total) {
   $('plTrackList').innerHTML = skelRows(12);
 
   try {
-    const d = await api(`/api/playlists/${id}/tracks`);
+    const d = await api(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`);
 
     // 🔥 FIX PRINCIPALE: normalizzazione Spotify response
     const tracks = (d.items || [])
