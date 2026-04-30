@@ -255,12 +255,13 @@ async function openPlaylist(id, name, img, total) {
   try {
     const d = await api(`/api/playlists/${id}/tracks`);
 
+    // ✅ FIX IMPORTANTE: gestione robusta Spotify
     const tracks = (d.items || [])
-      .map(i => i.track)
-      .filter(t => t && t.id && t.name && t.artists);
+      .map(i => i?.track)
+      .filter(t => t && t.name); // basta questo
 
     if (!tracks.length) {
-      $('plTrackList').innerHTML = emptyMsg('Playlist vuota o brani non disponibili');
+      $('plTrackList').innerHTML = emptyMsg('Playlist vuota o non accessibile');
       return;
     }
 
@@ -270,7 +271,7 @@ async function openPlaylist(id, name, img, total) {
 
   } catch (e) {
     console.error('openPlaylist error:', e);
-    $('plTrackList').innerHTML = emptyMsg('Impossibile caricare i brani della playlist');
+    $('plTrackList').innerHTML = emptyMsg('Errore caricamento playlist');
   }
 }
 
