@@ -402,16 +402,14 @@ async function loadStats(){
    AI — GEMINI SECTION (fully implemented)
 ══════════════════════════════════════════════════════ */
 function initAiSection() {
-  // If we already have results, just render them
-  if(S.ai.data){ renderAiResults(S.ai.data); return; }
-  // Otherwise show the prompt state
-  const out = $('aiResults');
-  out.innerHTML=`
+  if (S.ai.data) { renderAiResults(S.ai.data); return; }
+  const out = $('aiOut');
+  out.innerHTML = `
     <div class="ai-intro">
       <div class="ai-intro-icon">🤖</div>
       <h3>Raccomandazioni Personalizzate</h3>
-      <p>Gemini analizzerà i tuoi ascolti e ti consiglierà artisti e brani nuovi basandosi sui tuoi gusti.</p>
-      <p class="ai-note">Potrai anche creare una playlist Spotify con i brani consigliati in un click.</p>
+      <p>Gemini analizzerà i tuoi ascolti e ti suggerirà artisti e brani nuovi basandosi sui tuoi gusti musicali.</p>
+      <p class="ai-note">Puoi anche creare una playlist Spotify con i brani consigliati in un click.</p>
     </div>`;
 }
 
