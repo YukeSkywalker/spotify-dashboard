@@ -243,25 +243,23 @@
     </section>
 
     <!-- AI -->
-   <div id="aiOut" class="ai-wrap">
-
-  <!-- stato iniziale -->
-  <div class="ai-empty" id="aiEmpty">
-    <div class="ai-empty-ico">✨</div>
-    <h3>Scopri nuova musica</h3>
-    <p>L'AI analizzerà i tuoi gusti e ti proporrà brani perfetti per te</p>
+<section class="view" id="view-ai">
+  <div class="vh">
+    <div>
+      <h2>AI Consigli <span class="ai-badge-lg">Gemini</span></h2>
+      <p class="vsub">Raccomandazioni personalizzate basate sui tuoi gusti</p>
+    </div>
+    <button class="ai-gen-btn" id="aiGenBtn">✨ Genera Consigli</button>
   </div>
-
-  <!-- loading -->
-  <div class="ai-loading" id="aiLoading" style="display:none">
-    <div class="spinner"></div>
-    <p>Generazione consigli in corso...</p>
+  <div id="aiOut">
+    <div class="ai-intro">
+      <div class="ai-intro-icon">🤖</div>
+      <h3>Raccomandazioni Personalizzate</h3>
+      <p>Gemini analizzerà i tuoi ascolti e ti suggerirà artisti e brani nuovi basandosi sui tuoi gusti musicali.</p>
+      <p class="ai-note">Puoi anche creare una playlist Spotify con i brani consigliati in un click.</p>
+    </div>
   </div>
-
-  <!-- risultati -->
-  <div class="ai-results" id="aiResults"></div>
-
-</div>
+</section>
 
     <!-- PLAYER -->
     <section class="view" id="view-player">
