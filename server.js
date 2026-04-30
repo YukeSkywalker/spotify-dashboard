@@ -174,11 +174,18 @@ app.get('/api/playlists', guard, async (req, res) => {
   catch (e) { apiError(res, e); }
 });
 
-// FIX: removed fields= filter and undefined spFetch
+//API per get Tracks
 app.get('/api/playlists/:id/tracks', guard, async (req, res) => {
   try {
-    res.json(await spotifyFetch(req.session,
-      `https://api.spotify.com/v1/playlists/${req.params.id}/tracks?limit=100`));
+    const allItems = [];
+    let url = `https://api.spotify.com/v1/playlists/${req.params.id}/tracks?limit=100&market=from_token`;
+    while (url) {
+      const page = await spotifyFetch(req.session, url);
+      if (!page) break;
+      allItems.push(...(page.items || []));
+      url = page.next || null;
+    }
+    res.json({ items: allItems, total: allItems.length });
   } catch (e) { apiError(res, e); }
 });
 
@@ -206,10 +213,16 @@ app.get('/api/search', guard, async (req, res) => {
   const { q, limit = 20 } = req.query;
   if (!q || !q.trim()) return res.status(400).json({ error: 'query_required' });
   try {
-    res.json(await spotifyFetch(req.session,
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(q.trim())}&type=track,artist&limit=${limit}&market=from_token`));
-  } catch (e) { apiError(res, e); }
+    const query = q.trim().replace(/[<>]/g, '');
+    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track,artist&limit=${Math.min(Number(limit), 50)}&market=IT`;
+    const data = await spotifyFetch(req.session, url);
+    res.json(data);
+  } catch (e) {
+    console.error('Search error:', e.message);
+    apiError(res, e);
+  }
 });
+
 
 /* ── Recommendations — FIX: was using undefined spFetch  */
 app.get('/api/recommendations', guard, async (req, res) => {
