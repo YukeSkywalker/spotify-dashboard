@@ -387,7 +387,7 @@ function initAiSection() {
   // If we already have results, just render them
   if(S.ai.data){ renderAiResults(S.ai.data); return; }
   // Otherwise show the prompt state
-  const out=$('aiOut');
+  const out = $('aiResults');
   out.innerHTML=`
     <div class="ai-intro">
       <div class="ai-intro-icon">🤖</div>
