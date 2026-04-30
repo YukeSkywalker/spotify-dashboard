@@ -250,18 +250,35 @@ async function openPlaylist(id, name, img, total) {
     ci.style.display = 'none';
   }
 
-  $('plTrackList').innerHTML = skelRows(10);
+  $('plTrackList').innerHTML = skelRows(12);
 
   try {
     const d = await api(`/api/playlists/${id}/tracks`);
 
-    // ✅ FIX IMPORTANTE: gestione robusta Spotify
+    // 🔥 FIX PRINCIPALE: normalizzazione Spotify response
     const tracks = (d.items || [])
-      .map(i => i?.track)
-      .filter(t => t && t.name); // basta questo
+      .map(item => {
+        // Spotify può avere:
+        // - item.track null
+        // - item.track valido
+        const t = item?.track;
+        if (!t) return null;
 
-    if (!tracks.length) {
-      $('plTrackList').innerHTML = emptyMsg('Playlist vuota o non accessibile');
+        // filtra solo track vere (no episode, no null)
+        if (!t.name || !t.uri || !t.artists) return null;
+
+        return {
+          name: t.name,
+          uri: t.uri,
+          duration_ms: t.duration_ms,
+          album: t.album,
+          artists: t.artists
+        };
+      })
+      .filter(Boolean);
+
+    if (tracks.length === 0) {
+      $('plTrackList').innerHTML = emptyMsg('Playlist vuota o brani non disponibili su Spotify');
       return;
     }
 
