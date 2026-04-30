@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Melodia — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body>
+
+  <!-- ══ SIDEBAR ══════════════════════════════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="sb-logo">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.622.622 0 0 1 .207.857zm1.223-2.722a.779.779 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 0 1-.973-.517.779.779 0 0 1 .517-.972c3.632-1.102 8.147-.569 11.236 1.326a.779.779 0 0 1 .257 1.072zm.105-2.835C14.69 8.956 9.365 8.773 6.18 9.747a.935.935 0 1 1-.543-1.79c3.632-1.102 9.67-.89 13.48 1.401a.935.935 0 0 1-.203 1.71z" />
+        </svg>
+        <span>Melodia</span>
+      </div>
+      <button class="theme-btn" id="themeBtn" title="Tema">☀</button>
+    </div>
+
+    <div class="sb-user" id="sbUser">
+      <div class="sb-avatar-wrap">
+        <img id="sbAvatar" src="" alt="" style="display:none" />
+        <div class="sb-avatar-ph" id="sbAvatarPh">?</div>
+      </div>
+      <div class="sb-user-info">
+        <div class="sb-name" id="sbName">Caricamento…</div>
+        <div class="sb-plan" id="sbPlan"></div>
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <button class="nav-item active" data-s="overview">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
+        </svg>
+        Panoramica
+      </button>
+      <button class="nav-item" data-s="top-tracks">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+        </svg>
+        Top Tracks
+      </button>
+      <button class="nav-item" data-s="top-artists">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+        </svg>
+        Top Artists
+      </button>
+      <button class="nav-item" data-s="recent">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
+        </svg>
+        Recenti
+      </button>
+      <button class="nav-item" data-s="playlists">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z" />
+        </svg>
+        Playlist
+      </button>
+      <button class="nav-item" data-s="search">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+        </svg>
+        Cerca
+      </button>
+      <button class="nav-item" data-s="stats">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+        </svg>
+        Statistiche
+      </button>
+
+      <button class="nav-item" data-s="ai"><svg viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+        </svg>AI Consigli<span class="ai-badge">Gemini</span></button>
+
+      <button class="nav-item" data-s="player">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z" />
+        </svg>
+        In Riproduzione
+      </button>
+    </nav>
+
+    <button class="sb-logout" id="logoutBtn">
+      <svg viewBox="0 0 24 24">
+        <path
+          d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+      </svg>
+      Logout
+    </button>
+  </aside>
+
+  <!-- ══ MOBILE HEADER ════════════════════════════════════════════ -->
+  <header class="mob-header">
+    <button class="mob-menu" id="mobMenu">
+      <svg viewBox="0 0 24 24">
+        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+      </svg>
+    </button>
+    <span class="mob-title">Melodia</span>
+    <button class="mob-theme" id="mobTheme">☀</button>
+  </header>
+
+  <!-- ══ MAIN ═════════════════════════════════════════════════════ -->
+  <main class="main-area">
+
+    <!-- OVERVIEW -->
+    <section class="view active" id="view-overview">
+      <div class="view-header">
+        <h2>Panoramica</h2>
+        <p class="view-sub">Bentornato, <strong id="ovName">—</strong></p>
+      </div>
+      <div class="stat-row" id="statRow">
+        <div class="stat-box">
+          <div class="stat-ico">♫</div>
+          <div class="stat-val" id="stTracks">—</div>
+          <div class="stat-lbl">Top Tracks</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-ico">👤</div>
+          <div class="stat-val" id="stArtists">—</div>
+          <div class="stat-lbl">Top Artists</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-ico">◈</div>
+          <div class="stat-val" id="stPlaylists">—</div>
+          <div class="stat-lbl">Playlist</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-ico">⏱</div>
+          <div class="stat-val" id="stMinutes">—</div>
+          <div class="stat-lbl">Min. ascoltati</div>
+        </div>
+      </div>
+      <div class="ov-artist-card" id="ovArtistCard"></div>
+      <div class="ov-cols">
+        <div>
+          <div class="col-label">Top 5 Tracks</div>
+          <div id="ovTracks"></div>
+        </div>
+        <div>
+          <div class="col-label">Ascoltati di recente</div>
+          <div id="ovRecent"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TOP TRACKS -->
+    <section class="view" id="view-top-tracks">
+      <div class="view-header">
+        <h2>Top Tracks</h2>
+        <div class="tabs" id="ttTabs">
+          <button class="tab active" data-r="short_term">4 sett.</button>
+          <button class="tab" data-r="medium_term">6 mesi</button>
+          <button class="tab" data-r="long_term">Sempre</button>
+        </div>
+      </div>
+      <div class="track-list" id="ttList"></div>
+    </section>
+
+    <!-- TOP ARTISTS -->
+    <section class="view" id="view-top-artists">
+      <div class="view-header">
+        <h2>Top Artists</h2>
+        <div class="tabs" id="taTabs">
+          <button class="tab active" data-r="short_term">4 sett.</button>
+          <button class="tab" data-r="medium_term">6 mesi</button>
+          <button class="tab" data-r="long_term">Sempre</button>
+        </div>
+      </div>
+      <div class="artist-grid" id="taList"></div>
+    </section>
+
+    <!-- RECENT -->
+    <section class="view" id="view-recent">
+      <div class="view-header">
+        <h2>Recenti</h2>
+        <p class="view-sub">Ultimi 50 brani ascoltati</p>
+      </div>
+      <div class="track-list" id="recentList"></div>
+    </section>
+
+    <!-- PLAYLISTS -->
+    <section class="view" id="view-playlists">
+      <div class="view-header">
+        <h2>Playlist</h2>
+      </div>
+      <div class="playlist-grid" id="plGrid"></div>
+      <div id="plDetail" style="display:none">
+        <button class="back-btn" id="plBack">← Playlist</button>
+        <div class="pl-detail-head">
+          <img id="plDetailImg" src="" alt="" style="display:none" />
+          <h3 id="plDetailName"></h3>
+        </div>
+        <div class="track-list" id="plTrackList"></div>
+      </div>
+    </section>
+
+    <!-- SEARCH -->
+    <section class="view" id="view-search">
+      <div class="view-header">
+        <h2>Cerca</h2>
+      </div>
+      <div class="search-wrap">
+        <svg class="search-ico" viewBox="0 0 24 24">
+          <path
+            d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+        </svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Cerca brani, artisti…"
+          autocomplete="off" />
+        <button class="search-clear" id="searchClear" style="display:none">✕</button>
+      </div>
+      <div id="searchResults"></div>
+      <div class="empty-hint" id="searchHint">
+        <p>Inizia a digitare per cercare</p>
+      </div>
+    </section>
+
+    <!-- STATS -->
+    <section class="view" id="view-stats">
+      <div class="view-header">
+        <h2>Statistiche</h2>
+        <p class="view-sub">La tua musica analizzata</p>
+      </div>
+      <div id="statsContent"></div>
+    </section>
+
+    <!-- AI -->
+    <section class="view" id="view-ai">
+      <div class="vh">
+        <div>
+          <h2>AI Consigli <span class="ai-badge-lg">Gemini</span></h2>
+          <p class="vsub">Raccomandazioni personalizzate basate sui tuoi gusti</p>
+        </div>
+        <button class="action-btn ai-gen-btn" id="aiGenBtn">✨ Genera Consigli</button>
+      </div>
+      <div id="aiOut">
+        <div class="empty-hint">
+          <p>Premi "Genera Consigli" per ottenere raccomandazioni AI personalizzate</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PLAYER -->
+    <section class="view" id="view-player">
+      <div class="view-header">
+        <h2>In Riproduzione</h2>
+        <p class="view-sub">Controlli riproduzione completi</p>
+      </div>
+      <div id="playerPageContent"></div>
+    </section>
+
+  </main>
+
+  <!-- ══ PLAYER BAR ════════════════════════════════════════════════ -->
+  <div class="player-bar" id="playerBar">
+    <div class="pb-track">
+      <img class="pb-art" id="pbArt" src="" alt="" style="display:none" />
+      <div class="pb-art-ph" id="pbArtPh">♫</div>
+      <div class="pb-info">
+        <div class="pb-title" id="pbTitle">Nessun brano</div>
+        <div class="pb-artist" id="pbArtist">—</div>
+      </div>
+    </div>
+    <div class="pb-center">
+      <div class="pb-ctrls">
+        <button class="pb-btn" id="pbPrev" title="Precedente">
+          <svg viewBox="0 0 24 24">
+            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+          </svg>
+        </button>
+        <button class="pb-btn pb-play" id="pbPlay" title="Play/Pausa">
+          <svg class="ico-play" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <svg class="ico-pause" viewBox="0 0 24 24" style="display:none">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
+        </button>
+        <button class="pb-btn" id="pbNext" title="Successivo">
+          <svg viewBox="0 0 24 24">
+            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+          </svg>
+        </button>
+      </div>
+      <div class="pb-prog-wrap">
+        <span class="pb-time" id="pbElapsed">0:00</span>
+        <div class="pb-prog" id="pbProg">
+          <div class="pb-prog-fill" id="pbFill"></div>
+        </div>
+        <span class="pb-time" id="pbTotal">0:00</span>
+      </div>
+    </div>
+    <div class="pb-right">
+      <div class="pb-vol">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
+        </svg>
+        <input type="range" id="pbVol" min="0" max="100" value="80" />
+      </div>
+      <a class="pb-spotify" href="https://open.spotify.com" target="_blank" title="Apri Spotify">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.622.622 0 0 1 .207.857zm1.223-2.722a.779.779 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 0 1-.973-.517.779.779 0 0 1 .517-.972c3.632-1.102 8.147-.569 11.236 1.326a.779.779 0 0 1 .257 1.072zm.105-2.835C14.69 8.956 9.365 8.773 6.18 9.747a.935.935 0 1 1-.543-1.79c3.632-1.102 9.67-.89 13.48 1.401a.935.935 0 0 1-.203 1.71z" />
+        </svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- ══ OVERLAYS ══════════════════════════════════════════════════ -->
+  <div class="overlay" id="overlay"></div>
+  <div class="toast" id="toast"></div>
+
+  <script src="/app.js"></script>
+</body>
+
+</html>
