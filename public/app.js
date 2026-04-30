@@ -238,22 +238,39 @@ function renderPlaylists(pls){
 }
 
 async function openPlaylist(id, name, img, total) {
-  $('plGrid').style.display='none';
-  $('plDetail').style.display='block';
-  $('plDetailName').textContent=name;
-  const ci=$('plDetailImg');
-  if(img){ci.src=img;ci.style.display='block';}else{ci.style.display='none';}
-  $('plTrackList').innerHTML=skelRows(10);
+  $('plGrid').style.display = 'none';
+  $('plDetail').style.display = 'block';
+  $('plDetailName').textContent = name;
+
+  const ci = $('plDetailImg');
+  if (img) {
+    ci.src = img;
+    ci.style.display = 'block';
+  } else {
+    ci.style.display = 'none';
+  }
+
+  $('plTrackList').innerHTML = skelRows(10);
 
   try {
     const d = await api(`/api/playlists/${id}/tracks`);
-    // FIX: correctly filter items — track can be null for local/unavailable tracks
-    const tracks = (d.items||[]).filter(i => i && i.track && i.track.id && i.track.name);
-    if(!tracks.length){ $('plTrackList').innerHTML=emptyMsg('Playlist vuota o brani non disponibili'); return; }
-    $('plTrackList').innerHTML=tracks.map((item,i)=>trackRow(item.track,i)).join('');
-  } catch(e) {
+
+    const tracks = (d.items || [])
+      .map(i => i.track)
+      .filter(t => t && t.id && t.name && t.artists);
+
+    if (!tracks.length) {
+      $('plTrackList').innerHTML = emptyMsg('Playlist vuota o brani non disponibili');
+      return;
+    }
+
+    $('plTrackList').innerHTML = tracks
+      .map((t, i) => trackRow(t, i))
+      .join('');
+
+  } catch (e) {
     console.error('openPlaylist error:', e);
-    $('plTrackList').innerHTML=emptyMsg('Impossibile caricare i brani della playlist');
+    $('plTrackList').innerHTML = emptyMsg('Impossibile caricare i brani della playlist');
   }
 }
 
@@ -276,32 +293,50 @@ function initSearch(){
 }
 
 async function doSearch(q) {
-  const res=$('searchResults');
+  const res = $('searchResults');
+
   try {
     const d = await api(`/api/search?q=${encodeURIComponent(q)}&limit=20`);
-    const tracks  = d.tracks?.items  || [];
-    const artists = d.artists?.items || [];
-    if(!tracks.length && !artists.length){ res.innerHTML=`<div class="empty">Nessun risultato per "<strong>${esc(q)}</strong>"</div>`; return; }
-    let html='';
-    if(tracks.length){
-      html+=`<div class="search-section-title">Brani</div>`;
-      html+=tracks.map((t,i)=>trackRow(t,i)).join('');
+
+    const tracks = d?.tracks?.items || [];
+    const artists = d?.artists?.items || [];
+
+    if (!tracks.length && !artists.length) {
+      res.innerHTML = `<div class="empty">Nessun risultato per "<strong>${esc(q)}</strong>"</div>`;
+      return;
     }
-    if(artists.length){
-      html+=`<div class="search-section-title">Artisti</div>`;
-      html+=artists.slice(0,8).map(a=>`
-        <div class="artist-search-item">
-          <img class="asi-img" src="${esc(a.images?.[0]?.url||'')}" alt="${esc(a.name)}" onerror="this.style.display='none'"/>
+
+    let html = '';
+
+    // 🎵 TRACKS
+    if (tracks.length) {
+      html += `<div class="search-section-title">Brani</div>`;
+      html += tracks
+        .filter(t => t && t.name && t.artists)
+        .map((t, i) => trackRow(t, i))
+        .join('');
+    }
+
+    // 👤 ARTISTS
+    if (artists.length) {
+      html += `<div class="search-section-title">Artisti</div>`;
+      html += artists.slice(0, 8).map(a => `
+        <div class="artist-search-item" onclick="searchAndNav('${esc(a.name)}')">
+          <img class="asi-img" src="${esc(a.images?.[0]?.url || '')}" 
+               onerror="this.style.display='none'"/>
           <div>
             <div class="asi-name">${esc(a.name)}</div>
-            <div class="asi-gen">${(a.genres||[]).slice(0,2).join(', ')||'—'}</div>
+            <div class="asi-gen">${(a.genres || []).slice(0, 2).join(', ') || '—'}</div>
           </div>
-        </div>`).join('');
+        </div>
+      `).join('');
     }
-    res.innerHTML=html;
-  } catch(e) {
+
+    res.innerHTML = html;
+
+  } catch (e) {
     console.error('Search error:', e);
-    res.innerHTML=emptyMsg(`Ricerca fallita: ${e.message}`);
+    res.innerHTML = emptyMsg('Errore durante la ricerca');
   }
 }
 
@@ -363,51 +398,85 @@ function initAiSection() {
 }
 
 async function generateAiRecommendations() {
-  const btn=$('aiGenBtn');
-  const out=$('aiOut');
-  btn.disabled=true; btn.textContent='✨ Generazione…';
-  out.innerHTML='<div class="spinner"></div><p style="text-align:center;color:var(--t3);font-size:.85rem;margin-top:.5rem">Gemini sta analizzando la tua musica…</p>';
+  const btn = $('aiGenBtn');
+  const out = $('aiOut');
+
+  btn.disabled = true;
+  btn.textContent = '✨ Generazione…';
+
+  out.innerHTML = `
+    <div class="spinner"></div>
+    <p style="text-align:center;color:var(--t3);font-size:.85rem;margin-top:.5rem">
+      Analisi dei tuoi gusti in corso…
+    </p>
+  `;
 
   try {
-    // Gather user data
-    const [ttR, taR] = await Promise.allSettled([
-      api('/api/top-tracks?time_range=medium_term&limit=20'),
-      api('/api/top-artists?time_range=medium_term&limit=20')
-    ]);
-    const topTracks  = ttR.status==='fulfilled' ? (ttR.value?.items||[]).map(t=>t.name+' - '+t.artists?.[0]?.name) : [];
-    const topArtists = taR.status==='fulfilled' ? (taR.value?.items||[]).map(a=>a.name) : [];
-    const genreMap   = {};
-    if(taR.status==='fulfilled')(taR.value?.items||[]).forEach(a=>(a.genres||[]).forEach(g=>{genreMap[g]=(genreMap[g]||0)+1;}));
-    const topGenres  = Object.entries(genreMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([g])=>g);
+    // 🔥 PRENDI TOP 3 REALI
+    const tt = await api('/api/top-tracks?time_range=short_term&limit=10');
 
-    const result = await api('/api/ai/recommend', {
-      method:'POST',
-      body: JSON.stringify({ topTracks, topArtists, topGenres })
+    const top3 = (tt.items || []).slice(0, 3);
+
+    const seeds = top3.map(t => ({
+      name: t.name,
+      artist: t.artists?.[0]?.name
+    }));
+
+    // 🔎 CERCA BRANI SIMILI (riusa search backend)
+    let suggestions = [];
+
+    for (const s of seeds) {
+      try {
+        const d = await api(`/api/search?q=${encodeURIComponent(s.name + ' ' + s.artist)}&limit=5`);
+        const found = d?.tracks?.items || [];
+
+        suggestions.push(
+          ...found.filter(f =>
+            f.name !== s.name // evita duplicati diretti
+          )
+        );
+      } catch (_) {}
+    }
+
+    // rimuovi duplicati
+    const unique = [];
+    const ids = new Set();
+
+    suggestions.forEach(t => {
+      if (t.id && !ids.has(t.id)) {
+        ids.add(t.id);
+        unique.push(t);
+      }
     });
 
-    S.ai.data = result;
-    renderAiResults(result);
-    toast('✨ Consigli AI generati!','ai');
-  } catch(e) {
-    if(e.message==='UNAUTH') return;
-    if(e.message==='gemini_not_configured'){
-      out.innerHTML=`<div class="ai-error-card">
-        <div class="ai-error-ico">⚠️</div>
-        <h3>Gemini non configurato</h3>
-        <p>Aggiungi la variabile <code>GEMINI_API_KEY</code> nelle impostazioni di Render.</p>
-        <p>Ottieni una chiave gratuita su <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a></p>
-      </div>`;
-    } else {
-      out.innerHTML=`<div class="ai-error-card">
-        <div class="ai-error-ico">❌</div>
-        <h3>Errore generazione</h3>
-        <p>${esc(e.message)}</p>
-        <button class="action-btn" onclick="generateAiRecommendations()" style="margin-top:1rem">Riprova</button>
-      </div>`;
+    const finalTracks = unique.slice(0, 10);
+
+    if (!finalTracks.length) {
+      out.innerHTML = emptyMsg('Nessun suggerimento trovato');
+      return;
     }
-    toast('Errore AI: '+e.message,'err',5000);
+
+    // 🎨 RENDER
+    out.innerHTML = `
+      <div class="ai-result">
+        <div class="ai-section">
+          <div class="ai-section-title">🎵 Consigliati per te</div>
+          <div class="track-list">
+            ${finalTracks.map((t, i) => trackRow(t, i)).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+
+    toast('✨ Suggerimenti generati!', 'ai');
+
+  } catch (e) {
+    console.error(e);
+    out.innerHTML = emptyMsg('Errore generazione AI');
+    toast('Errore AI', 'err');
   } finally {
-    btn.disabled=false; btn.textContent='✨ Genera Consigli';
+    btn.disabled = false;
+    btn.textContent = '✨ Genera Consigli';
   }
 }
 
