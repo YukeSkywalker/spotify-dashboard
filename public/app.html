@@ -243,20 +243,25 @@
     </section>
 
     <!-- AI -->
-    <section class="view" id="view-ai">
-      <div class="vh">
-        <div>
-          <h2>AI Consigli <span class="ai-badge-lg">Gemini</span></h2>
-          <p class="vsub">Raccomandazioni personalizzate basate sui tuoi gusti</p>
-        </div>
-        <button class="action-btn ai-gen-btn" id="aiGenBtn">✨ Genera Consigli</button>
-      </div>
-      <div id="aiOut">
-        <div class="empty-hint">
-          <p>Premi "Genera Consigli" per ottenere raccomandazioni AI personalizzate</p>
-        </div>
-      </div>
-    </section>
+   <div id="aiOut" class="ai-wrap">
+
+  <!-- stato iniziale -->
+  <div class="ai-empty" id="aiEmpty">
+    <div class="ai-empty-ico">✨</div>
+    <h3>Scopri nuova musica</h3>
+    <p>L'AI analizzerà i tuoi gusti e ti proporrà brani perfetti per te</p>
+  </div>
+
+  <!-- loading -->
+  <div class="ai-loading" id="aiLoading" style="display:none">
+    <div class="spinner"></div>
+    <p>Generazione consigli in corso...</p>
+  </div>
+
+  <!-- risultati -->
+  <div class="ai-results" id="aiResults"></div>
+
+</div>
 
     <!-- PLAYER -->
     <section class="view" id="view-player">
