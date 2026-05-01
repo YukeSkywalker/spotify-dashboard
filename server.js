@@ -68,7 +68,6 @@ async function validToken(sess) {
   return sess.accessToken;
 }
 
-// THE ONLY fetch wrapper — no aliases, no spFetch
 async function spotifyFetch(sess, url, opts = {}) {
   const doReq = async (tok) => fetch(url, {
     ...opts,
@@ -78,7 +77,11 @@ async function spotifyFetch(sess, url, opts = {}) {
   let res = await doReq(tok);
   if (res.status === 401) { tok = await refreshToken(sess); res = await doReq(tok); }
   if (res.status === 204) return null;
-  if (!res.ok) throw new Error(`spotify_${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`Spotify ${res.status} for ${url}:`, body);
+    throw new Error(`spotify_${res.status}: ${body}`);
+  }
   return res.json();
 }
 
@@ -133,22 +136,23 @@ app.get('/api/me', guard, async (req, res) => {
 /* ── Top Tracks ──────────────────────────────────────── */
 app.get('/api/top-tracks', guard, async (req, res) => {
   const { time_range = 'medium_term', limit = 50 } = req.query;
-  try { res.json(await spotifyFetch(req.session, `https://api.spotify.com/v1/me/top/tracks?time_range=${time_range}&limit=${limit}`)); }
-  catch (e) { apiError(res, e); }
+  try {
+    res.json(await spotifyFetch(req.session,
+      `https://api.spotify.com/v1/me/top/tracks?time_range=${time_range}&limit=${limit}`));
+  } catch (e) { apiError(res, e); }
 });
 
-/* ── Top Artists — FIX: enrich followers if missing ─── */
+/* ── Top Artists ─────────────────────────────────────── */
 app.get('/api/top-artists', guard, async (req, res) => {
   const { time_range = 'medium_term', limit = 50 } = req.query;
   try {
     const data = await spotifyFetch(req.session,
       `https://api.spotify.com/v1/me/top/artists?time_range=${time_range}&limit=${limit}`);
 
-    // Spotify sometimes omits followers in top-artists. Enrich via /artists batch if needed.
+    // Enrich followers if missing (Spotify sometimes omits them from top-artists)
     const needEnrich = (data.items || []).filter(a => a.followers?.total == null);
     if (needEnrich.length > 0) {
-      // max 50 ids per call
-      const ids = needEnrich.slice(0,50).map(a => a.id).join(',');
+      const ids = needEnrich.slice(0, 50).map(a => a.id).join(',');
       try {
         const enriched = await spotifyFetch(req.session, `https://api.spotify.com/v1/artists?ids=${ids}`);
         const map = {};
@@ -156,7 +160,7 @@ app.get('/api/top-artists', guard, async (req, res) => {
         data.items = data.items.map(a =>
           map[a.id] ? { ...a, followers: map[a.id].followers, images: map[a.id].images || a.images, popularity: map[a.id].popularity } : a
         );
-      } catch (_) { /* best effort, send what we have */ }
+      } catch (_) { /* best effort */ }
     }
     res.json(data);
   } catch (e) { apiError(res, e); }
@@ -168,17 +172,27 @@ app.get('/api/recent', guard, async (req, res) => {
   catch (e) { apiError(res, e); }
 });
 
-/* ── Playlists ───────────────────────────────────────── */
+/* ── Playlists list ──────────────────────────────────── */
 app.get('/api/playlists', guard, async (req, res) => {
-  try { res.json(await spotifyFetch(req.session, 'https://api.spotify.com/v1/me/playlists?limit=50')); }
-  catch (e) { apiError(res, e); }
+  try {
+    // Paginate to get ALL playlists (Spotify max 50 per page)
+    const allItems = [];
+    let url = 'https://api.spotify.com/v1/me/playlists?limit=50';
+    while (url) {
+      const page = await spotifyFetch(req.session, url);
+      if (!page) break;
+      allItems.push(...(page.items || []));
+      url = page.next || null;
+    }
+    res.json({ items: allItems, total: allItems.length });
+  } catch (e) { apiError(res, e); }
 });
 
-//API per get Tracks
+/* ── Playlist tracks — paginated, market=IT ──────────── */
 app.get('/api/playlists/:id/tracks', guard, async (req, res) => {
   try {
     const allItems = [];
-    let url = `https://api.spotify.com/v1/playlists/${req.params.id}/tracks?limit=100&market=from_token`;
+    let url = `https://api.spotify.com/v1/playlists/${req.params.id}/tracks?limit=100&market=IT`;
     while (url) {
       const page = await spotifyFetch(req.session, url);
       if (!page) break;
@@ -208,27 +222,36 @@ app.post('/api/playlists/:id/tracks', guard, async (req, res) => {
   } catch (e) { apiError(res, e); }
 });
 
-/* ── Search — FIX: was using undefined spFetch ───────── */
+/* ── Search — market=IT (from_token è deprecato) ────── */
 app.get('/api/search', guard, async (req, res) => {
   const { q, limit = 20 } = req.query;
   if (!q || !q.trim()) return res.status(400).json({ error: 'query_required' });
   try {
-    const query = q.trim().replace(/[<>]/g, '');
-    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track,artist&limit=${Math.min(Number(limit), 50)}&market=IT`;
-    const data = await spotifyFetch(req.session, url);
-    res.json(data);
-  } catch (e) {
-    console.error('Search error:', e.message);
-    apiError(res, e);
-  }
+    const clean = q.trim().replace(/[<>]/g, '');
+    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(clean)}&type=track,artist&limit=${Math.min(Number(limit), 50)}&market=IT`;
+    res.json(await spotifyFetch(req.session, url));
+  } catch (e) { apiError(res, e); }
 });
 
+/* ── Search URI (for AI playlist) — market=IT ────────── */
+app.get('/api/search-uri', guard, async (req, res) => {
+  const { track, artist } = req.query;
+  if (!track) return res.status(400).json({ error: 'track_required' });
+  try {
+    const q = artist ? `track:${track} artist:${artist}` : track;
+    const d = await spotifyFetch(req.session,
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1&market=IT`);
+    const item = d.tracks?.items?.[0];
+    if (!item) return res.json({ found: false });
+    res.json({ found:true, uri:item.uri, name:item.name, artist:item.artists?.[0]?.name, album_art:item.album?.images?.[0]?.url, duration_ms:item.duration_ms });
+  } catch (e) { apiError(res, e); }
+});
 
-/* ── Recommendations — FIX: was using undefined spFetch  */
+/* ── Recommendations — market=IT ─────────────────────── */
 app.get('/api/recommendations', guard, async (req, res) => {
   const { seed_tracks, seed_artists, seed_genres, limit = 20 } = req.query;
   try {
-    const p = new URLSearchParams({ limit, market:'from_token' });
+    const p = new URLSearchParams({ limit, market: 'IT' });
     if (seed_tracks)  p.set('seed_tracks',  seed_tracks);
     if (seed_artists) p.set('seed_artists', seed_artists);
     if (seed_genres)  p.set('seed_genres',  seed_genres);
@@ -270,12 +293,7 @@ app.put('/api/volume', guard, async (req, res) => {
 app.post('/api/ai/recommend', guard, async (req, res) => {
   if (!GEMINI_KEY) return res.status(503).json({ error: 'gemini_not_configured' });
   const { topTracks, topArtists, topGenres } = req.body;
-  const prompt = `Sei un esperto musicale AI. Profilo utente:
-Artisti top: ${(topArtists||[]).slice(0,6).join(', ')}.
-Brani top: ${(topTracks||[]).slice(0,6).join(', ')}.
-Generi: ${(topGenres||[]).slice(0,5).join(', ')}.
-Rispondi SOLO con JSON puro, nessun testo, nessun markdown:
-{"summary":"analisi 2 frasi in italiano","mood":"vibe 3-4 parole italiano","playlist_name":"nome creativo italiano","recommendations":[{"type":"artist","name":"...","reason":"..."},{"type":"artist","name":"...","reason":"..."},{"type":"artist","name":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."}]}`;
+  const prompt = `Sei un esperto musicale AI. Profilo utente:\nArtisti top: ${(topArtists||[]).slice(0,6).join(', ')}.\nBrani top: ${(topTracks||[]).slice(0,6).join(', ')}.\nGeneri: ${(topGenres||[]).slice(0,5).join(', ')}.\nRispondi SOLO con JSON puro, nessun testo, nessun markdown:\n{"summary":"analisi 2 frasi in italiano","mood":"vibe 3-4 parole italiano","playlist_name":"nome creativo italiano","recommendations":[{"type":"artist","name":"...","reason":"..."},{"type":"artist","name":"...","reason":"..."},{"type":"artist","name":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."},{"type":"track","name":"...","artist":"...","reason":"..."}]}`;
   try {
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
@@ -289,20 +307,6 @@ Rispondi SOLO con JSON puro, nessun testo, nessun markdown:
     if (!match) throw new Error('no_json_in_response');
     res.json(JSON.parse(match[0]));
   } catch (e) { console.error('Gemini:', e.message); res.status(500).json({ error:'ai_error', detail:e.message }); }
-});
-
-// Helper: find Spotify URI for a track name (used by AI playlist creation)
-app.get('/api/search-uri', guard, async (req, res) => {
-  const { track, artist } = req.query;
-  if (!track) return res.status(400).json({ error:'track_required' });
-  try {
-    const q = artist ? `track:${track} artist:${artist}` : track;
-    const d = await spotifyFetch(req.session,
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1&market=from_token`);
-    const item = d.tracks?.items?.[0];
-    if (!item) return res.json({ found:false });
-    res.json({ found:true, uri:item.uri, name:item.name, artist:item.artists?.[0]?.name, album_art:item.album?.images?.[0]?.url, duration_ms:item.duration_ms });
-  } catch (e) { apiError(res, e); }
 });
 
 /* ── Pages ───────────────────────────────────────────── */
