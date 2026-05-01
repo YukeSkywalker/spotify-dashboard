@@ -9,43 +9,51 @@ input{font-family:inherit;color:inherit}
 
 /* ── Tokens ───────────────────────────────────────────────── */
 :root,[data-theme="dark"]{
-  --bg:   #0b0b10;
-  --bg2:  #111119;
-  --s1:   #18181f;
-  --s2:   #21212b;
-  --s3:   #2a2a36;
-  --b1:   rgba(255,255,255,.07);
-  --b2:   rgba(255,255,255,.13);
-  --t1:   #f0edf8;
-  --t2:   #a8a5b8;
-  --t3:   #62607a;
-  --g:    #1DB954;
-  --g2:   #158a3e;
-  --gg:   rgba(29,185,84,.2);
-  --red:  #f43f5e;
-  --pur:  #7c3aed;
-  --sh:   rgba(0,0,0,.5);
-  --sh2:  rgba(0,0,0,.72);
-  --sbw:  242px;
-  --pbh:  78px;
+  --bg:     #0b0b10;
+  --bg2:    #111119;
+  --s1:     #18181f;
+  --s2:     #21212b;
+  --s3:     #2a2a36;
+  --b1:     rgba(255,255,255,.07);
+  --b2:     rgba(255,255,255,.13);
+  --t1:     #f0edf8;
+  --t2:     #a8a5b8;
+  --t3:     #62607a;
+  --g:      #1DB954;
+  --g2:     #158a3e;
+  --gg:     rgba(29,185,84,.2);
+  --red:    #f43f5e;
+  --pur:    #7c3aed;
+  --sh:     rgba(0,0,0,.5);
+  --sh2:    rgba(0,0,0,.72);
+  --sbw:    242px;
+  --pbh:    78px;
+  /* variabili usate nella sezione AI */
+  --card:   #18181f;
+  --border: rgba(255,255,255,.09);
+  --hover:  #21212b;
 }
 [data-theme="light"]{
-  --bg:   #f1f0f7;
-  --bg2:  #e8e6f2;
-  --s1:   #ffffff;
-  --s2:   #f4f2fc;
-  --s3:   #eae8f4;
-  --b1:   rgba(0,0,0,.07);
-  --b2:   rgba(0,0,0,.13);
-  --t1:   #16141f;
-  --t2:   #46445a;
-  --t3:   #8a88a2;
-  --g:    #189944;
-  --g2:   #0f6b30;
-  --gg:   rgba(29,185,84,.13);
-  --red:  #dc2626;
-  --sh:   rgba(0,0,0,.08);
-  --sh2:  rgba(0,0,0,.15);
+  --bg:     #f1f0f7;
+  --bg2:    #e8e6f2;
+  --s1:     #ffffff;
+  --s2:     #f4f2fc;
+  --s3:     #eae8f4;
+  --b1:     rgba(0,0,0,.07);
+  --b2:     rgba(0,0,0,.13);
+  --t1:     #16141f;
+  --t2:     #46445a;
+  --t3:     #8a88a2;
+  --g:      #189944;
+  --g2:     #0f6b30;
+  --gg:     rgba(29,185,84,.13);
+  --red:    #dc2626;
+  --sh:     rgba(0,0,0,.08);
+  --sh2:    rgba(0,0,0,.15);
+  /* variabili usate nella sezione AI */
+  --card:   #ffffff;
+  --border: rgba(0,0,0,.09);
+  --hover:  #f4f2fc;
 }
 
 /* ── Base ─────────────────────────────────────────────────── */
@@ -273,8 +281,9 @@ body{
 /* ── Artist search card ───────────────────────────────────── */
 .artist-search-item{
   display:flex;align-items:center;gap:11px;padding:.52rem .65rem;
-  border-radius:8px;cursor:default;border:1px solid transparent;transition:all .14s;
+  border-radius:8px;cursor:pointer;border:1px solid transparent;transition:all .14s;
 }
+.artist-search-item:hover{background:var(--s1);border-color:var(--b1)}
 .asi-img{width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--s2)}
 .asi-name{font-size:.85rem;font-weight:600}
 .asi-gen{font-size:.73rem;color:var(--t3);margin-top:2px}
