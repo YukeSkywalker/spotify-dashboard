@@ -243,36 +243,24 @@ async function openPlaylist(id, name, img, total) {
   $('plDetailName').textContent = name;
 
   const ci = $('plDetailImg');
-  if (img) {
-    ci.src = img;
-    ci.style.display = 'block';
-  } else {
-    ci.style.display = 'none';
-  }
+  if (img) { ci.src = img; ci.style.display = 'block'; }
+  else      { ci.style.display = 'none'; }
 
   $('plTrackList').innerHTML = skelRows(12);
 
   try {
-    // ✅ FIX: usa /api/playlists/:id/tracks (backend) con il parametro `id` corretto
+    // ✅ FIX: chiama il backend con il parametro `id` corretto (non playlistId)
     const d = await api(`/api/playlists/${id}/tracks`);
 
     const tracks = (d.items || [])
       .map(item => {
         const t = item?.track;
-        if (!t) return null;
-        // filtra solo track vere (no episode, no null)
-        if (!t.name || !t.uri || !t.artists) return null;
-        return {
-          name: t.name,
-          uri: t.uri,
-          duration_ms: t.duration_ms,
-          album: t.album,
-          artists: t.artists
-        };
+        if (!t || !t.name || !t.uri || !t.artists) return null;
+        return { name: t.name, uri: t.uri, duration_ms: t.duration_ms, album: t.album, artists: t.artists };
       })
       .filter(Boolean);
 
-    if (tracks.length === 0) {
+    if (!tracks.length) {
       $('plTrackList').innerHTML = emptyMsg('Playlist vuota o brani non disponibili su Spotify');
       return;
     }
@@ -309,7 +297,7 @@ async function doSearch(q) {
   try {
     const d = await api(`/api/search?q=${encodeURIComponent(q)}&limit=20`);
 
-    const tracks = d?.tracks?.items || [];
+    const tracks  = d?.tracks?.items  || [];
     const artists = d?.artists?.items || [];
 
     if (!tracks.length && !artists.length) {
@@ -328,13 +316,12 @@ async function doSearch(q) {
         .join('');
     }
 
-    // Artisti - cliccabili per vedere i loro brani
+    // Artisti — cliccabili per vedere i loro brani
     if (artists.length) {
       html += `<div class="search-section-title">Artisti</div>`;
       html += artists.slice(0, 8).map(a => `
         <div class="artist-search-item" onclick="openArtistResults('${esc(a.id)}','${esc(a.name)}','${esc(a.images?.[0]?.url||'')}')">
-          <img class="asi-img" src="${esc(a.images?.[0]?.url || '')}"
-               onerror="this.style.display='none'"/>
+          <img class="asi-img" src="${esc(a.images?.[0]?.url || '')}" onerror="this.style.display='none'"/>
           <div>
             <div class="asi-name">${esc(a.name)}</div>
             <div class="asi-gen">${(a.genres || []).slice(0, 2).join(', ') || '—'}</div>
@@ -352,14 +339,17 @@ async function doSearch(q) {
   }
 }
 
-/* Mostra i brani di un artista cliccato nella ricerca */
+/* Mostra brani di un artista cliccato nella ricerca */
 async function openArtistResults(artistId, artistName, artistImg) {
   const res = $('searchResults');
   const currentQuery = $('searchInput').value;
 
-  const header = `
+  res.innerHTML = `
     <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-      <button onclick="doSearch('${esc(currentQuery)}')" style="background:var(--s2);border:1px solid var(--border);color:var(--t1);padding:.32em .75em;border-radius:20px;cursor:pointer;font-size:.8rem">← Indietro</button>
+      <button onclick="doSearch('${esc(currentQuery)}')"
+        style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);padding:.32em .75em;border-radius:20px;cursor:pointer;font-size:.8rem">
+        ← Indietro
+      </button>
       ${artistImg ? `<img src="${esc(artistImg)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover"/>` : ''}
       <div>
         <div style="font-size:1rem;font-weight:700">${esc(artistName)}</div>
@@ -369,15 +359,16 @@ async function openArtistResults(artistId, artistName, artistImg) {
     ${skelRows(8)}
   `;
 
-  res.innerHTML = header;
-
   try {
     const d = await api(`/api/search?q=artist:${encodeURIComponent(artistName)}&limit=20`);
     const tracks = (d?.tracks?.items || []).filter(t => t && t.name && t.artists);
 
     res.innerHTML = `
       <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-        <button onclick="doSearch('${esc(currentQuery)}')" style="background:var(--s2);border:1px solid var(--border);color:var(--t1);padding:.32em .75em;border-radius:20px;cursor:pointer;font-size:.8rem">← Indietro</button>
+        <button onclick="doSearch('${esc(currentQuery)}')"
+          style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);padding:.32em .75em;border-radius:20px;cursor:pointer;font-size:.8rem">
+          ← Indietro
+        </button>
         ${artistImg ? `<img src="${esc(artistImg)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover"/>` : ''}
         <div>
           <div style="font-size:1rem;font-weight:700">${esc(artistName)}</div>
@@ -386,7 +377,7 @@ async function openArtistResults(artistId, artistName, artistImg) {
       </div>
       ${tracks.length
         ? `<div class="track-list">${tracks.map((t, i) => trackRow(t, i)).join('')}</div>`
-        : emptyMsg('Nessun brano trovato per ' + artistName)
+        : emptyMsg('Nessun brano trovato per ' + esc(artistName))
       }
     `;
   } catch (e) {
