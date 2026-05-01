@@ -232,29 +232,56 @@ function renderPlaylists(pls){
       </div>
       <div class="pl-info">
         <div class="pl-name">${esc(p.name)}</div>
-        <div class="pl-cnt">${p.tracks?.total != null ? p.tracks.total : '?'} brani · ${esc(p.owner?.display_name||'')}</div>
+        <div class="pl-cnt">${p.tracks?.total||0} brani · ${esc(p.owner?.display_name||'')}</div>
       </div>
     </div>`).join('');
 }
 
 async function openPlaylist(id, name, img, total) {
-  $('plGrid').style.display='none';
-  $('plDetail').style.display='block';
-  $('plDetailName').textContent=name;
-  const ci=$('plDetailImg');
-  if(img){ci.src=img;ci.style.display='block';}else{ci.style.display='none';}
-  $('plTrackList').innerHTML=skelRows(10);
+  $('plGrid').style.display = 'none';
+  $('plDetail').style.display = 'block';
+  $('plDetailName').textContent = name;
+
+  const ci = $('plDetailImg');
+  if (img) {
+    ci.src = img;
+    ci.style.display = 'block';
+  } else {
+    ci.style.display = 'none';
+  }
+
+  $('plTrackList').innerHTML = skelRows(12);
 
   try {
+    // ✅ FIX: usa /api/playlists/:id/tracks (backend) con il parametro `id` corretto
     const d = await api(`/api/playlists/${id}/tracks`);
-    // Il server restituisce { items: [...], total: N } già paginato
-    const rawItems = d.items || d.tracks?.items || [];
-    const tracks = rawItems.filter(i => i && i.track && i.track.id && i.track.name);
-    if(!tracks.length){ $('plTrackList').innerHTML=emptyMsg('Playlist vuota o brani non disponibili'); return; }
-    $('plTrackList').innerHTML=tracks.map((item,i)=>trackRow(item.track,i)).join('');
-  } catch(e) {
+
+    const tracks = (d.items || [])
+      .map(item => {
+        const t = item?.track;
+        if (!t) return null;
+        // filtra solo track vere (no episode, no null)
+        if (!t.name || !t.uri || !t.artists) return null;
+        return {
+          name: t.name,
+          uri: t.uri,
+          duration_ms: t.duration_ms,
+          album: t.album,
+          artists: t.artists
+        };
+      })
+      .filter(Boolean);
+
+    if (tracks.length === 0) {
+      $('plTrackList').innerHTML = emptyMsg('Playlist vuota o brani non disponibili su Spotify');
+      return;
+    }
+
+    $('plTrackList').innerHTML = tracks.map((t, i) => trackRow(t, i)).join('');
+
+  } catch (e) {
     console.error('openPlaylist error:', e);
-    $('plTrackList').innerHTML=emptyMsg('Impossibile caricare i brani della playlist');
+    $('plTrackList').innerHTML = emptyMsg('Errore caricamento playlist');
   }
 }
 
@@ -277,32 +304,94 @@ function initSearch(){
 }
 
 async function doSearch(q) {
-  const res=$('searchResults');
+  const res = $('searchResults');
+
   try {
     const d = await api(`/api/search?q=${encodeURIComponent(q)}&limit=20`);
-    const tracks  = d.tracks?.items  || [];
-    const artists = d.artists?.items || [];
-    if(!tracks.length && !artists.length){ res.innerHTML=`<div class="empty">Nessun risultato per "<strong>${esc(q)}</strong>"</div>`; return; }
-    let html='';
-    if(tracks.length){
-      html+=`<div class="search-section-title">Brani</div>`;
-      html+=tracks.map((t,i)=>trackRow(t,i)).join('');
+
+    const tracks = d?.tracks?.items || [];
+    const artists = d?.artists?.items || [];
+
+    if (!tracks.length && !artists.length) {
+      res.innerHTML = `<div class="empty">Nessun risultato per "<strong>${esc(q)}</strong>"</div>`;
+      return;
     }
-    if(artists.length){
-      html+=`<div class="search-section-title">Artisti</div>`;
-      html+=artists.slice(0,8).map(a=>`
-        <div class="artist-search-item">
-          <img class="asi-img" src="${esc(a.images?.[0]?.url||'')}" alt="${esc(a.name)}" onerror="this.style.display='none'"/>
+
+    let html = '';
+
+    // Brani
+    if (tracks.length) {
+      html += `<div class="search-section-title">Brani</div>`;
+      html += tracks
+        .filter(t => t && t.name && t.artists)
+        .map((t, i) => trackRow(t, i))
+        .join('');
+    }
+
+    // Artisti - cliccabili per vedere i loro brani
+    if (artists.length) {
+      html += `<div class="search-section-title">Artisti</div>`;
+      html += artists.slice(0, 8).map(a => `
+        <div class="artist-search-item" onclick="openArtistResults('${esc(a.id)}','${esc(a.name)}','${esc(a.images?.[0]?.url||'')}')">
+          <img class="asi-img" src="${esc(a.images?.[0]?.url || '')}"
+               onerror="this.style.display='none'"/>
           <div>
             <div class="asi-name">${esc(a.name)}</div>
-            <div class="asi-gen">${(a.genres||[]).slice(0,2).join(', ')||'—'}</div>
+            <div class="asi-gen">${(a.genres || []).slice(0, 2).join(', ') || '—'}</div>
           </div>
-        </div>`).join('');
+          <div style="margin-left:auto;font-size:.7rem;color:var(--t3);flex-shrink:0">Top brani →</div>
+        </div>
+      `).join('');
     }
-    res.innerHTML=html;
-  } catch(e) {
+
+    res.innerHTML = html;
+
+  } catch (e) {
     console.error('Search error:', e);
-    res.innerHTML=emptyMsg(`Ricerca fallita: ${e.message}`);
+    res.innerHTML = emptyMsg('Errore durante la ricerca');
+  }
+}
+
+/* Mostra i brani di un artista cliccato nella ricerca */
+async function openArtistResults(artistId, artistName, artistImg) {
+  const res = $('searchResults');
+  const currentQuery = $('searchInput').value;
+
+  const header = `
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <button onclick="doSearch('${esc(currentQuery)}')" style="background:var(--s2);border:1px solid var(--border);color:var(--t1);padding:.32em .75em;border-radius:20px;cursor:pointer;font-size:.8rem">← Indietro</button>
+      ${artistImg ? `<img src="${esc(artistImg)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover"/>` : ''}
+      <div>
+        <div style="font-size:1rem;font-weight:700">${esc(artistName)}</div>
+        <div style="font-size:.75rem;color:var(--t3)">Caricamento brani…</div>
+      </div>
+    </div>
+    ${skelRows(8)}
+  `;
+
+  res.innerHTML = header;
+
+  try {
+    const d = await api(`/api/search?q=artist:${encodeURIComponent(artistName)}&limit=20`);
+    const tracks = (d?.tracks?.items || []).filter(t => t && t.name && t.artists);
+
+    res.innerHTML = `
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+        <button onclick="doSearch('${esc(currentQuery)}')" style="background:var(--s2);border:1px solid var(--border);color:var(--t1);padding:.32em .75em;border-radius:20px;cursor:pointer;font-size:.8rem">← Indietro</button>
+        ${artistImg ? `<img src="${esc(artistImg)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover"/>` : ''}
+        <div>
+          <div style="font-size:1rem;font-weight:700">${esc(artistName)}</div>
+          <div style="font-size:.75rem;color:var(--t3)">${tracks.length} brani trovati</div>
+        </div>
+      </div>
+      ${tracks.length
+        ? `<div class="track-list">${tracks.map((t, i) => trackRow(t, i)).join('')}</div>`
+        : emptyMsg('Nessun brano trovato per ' + artistName)
+      }
+    `;
+  } catch (e) {
+    console.error('Artist tracks error:', e);
+    res.innerHTML += emptyMsg('Errore caricamento brani artista');
   }
 }
 
@@ -313,47 +402,21 @@ async function loadStats(){
   const c=$('statsContent'); if(!c)return;
   c.innerHTML='<div class="spinner"></div>';
   try{
-    // Carica tutti e 3 i range per avere il massimo di dati disponibili
-    const [tL,tM,aL,aM,rR]=await Promise.allSettled([
+    const [tL,aL,rR]=await Promise.all([
       api('/api/top-tracks?time_range=long_term&limit=50'),
-      api('/api/top-tracks?time_range=medium_term&limit=50'),
       api('/api/top-artists?time_range=long_term&limit=50'),
-      api('/api/top-artists?time_range=medium_term&limit=50'),
       api('/api/recent')
     ]);
-    const ok = r => r.status==='fulfilled' && r.value;
-
-    // Merge tracks: priorità long_term, fallback medium_term
-    const tracksLong   = ok(tL) ? (tL.value.items||[]) : [];
-    const tracksMedium = ok(tM) ? (tM.value.items||[]) : [];
-    // Usa long_term se ha dati, altrimenti medium_term
-    const bestTracks = tracksLong.length >= tracksMedium.length ? tracksLong : tracksMedium;
-
-    // Merge artisti: combina long + medium per avere più generi
-    const artistsLong   = ok(aL) ? (aL.value.items||[]) : [];
-    const artistsMedium = ok(aM) ? (aM.value.items||[]) : [];
-    const allArtistsMap = {};
-    [...artistsMedium, ...artistsLong].forEach(a => { allArtistsMap[a.id] = a; });
-    const allArtists = Object.values(allArtistsMap);
-
-    // Generi: da tutti gli artisti combinati
     const genreMap={};
-    allArtists.forEach(a=>(a.genres||[]).forEach(g=>{genreMap[g]=(genreMap[g]||0)+1;}));
+    (aL.items||[]).forEach(a=>(a.genres||[]).forEach(g=>{genreMap[g]=(genreMap[g]||0)+1;}));
     const genres=Object.entries(genreMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
-
     const dec={};
-    bestTracks.forEach(t=>{const y=t.album?.release_date?.slice(0,4);if(y){const d=Math.floor(+y/10)*10;dec[d]=(dec[d]||0)+1;}});
-    const recentItems = ok(rR) ? (rR.value.items||[]) : [];
-    const recMin=Math.round(recentItems.reduce((a,i)=>a+(i.track?.duration_ms||0),0)/60000);
-    const popAvg=bestTracks.length?Math.round(bestTracks.reduce((a,t)=>a+(t.popularity||0),0)/bestTracks.length):0;
-
-    const genreHtml = genres.length
-      ? genres.map(([g,n])=>`<div class="g-row"><span class="g-lbl">${esc(g)}</span><div class="g-track"><div class="g-fill" style="width:${Math.round(n/genres[0][1]*100)}%"></div></div><span class="g-cnt">${n}</span></div>`).join('')
-      : '<div class="empty">Ascolta più musica per vedere i generi</div>';
-
+    (tL.items||[]).forEach(t=>{const y=t.album?.release_date?.slice(0,4);if(y){const d=Math.floor(+y/10)*10;dec[d]=(dec[d]||0)+1;}});
+    const recMin=Math.round((rR.items||[]).reduce((a,i)=>a+(i.track?.duration_ms||0),0)/60000);
+    const popAvg=tL.items?.length?Math.round(tL.items.reduce((a,t)=>a+(t.popularity||0),0)/tL.items.length):0;
     c.innerHTML=`
       <div class="stats-section"><div class="stats-h">🎸 Generi preferiti</div>
-        <div class="genre-rows">${genreHtml}</div>
+        <div class="genre-rows">${genres.map(([g,n])=>`<div class="g-row"><span class="g-lbl">${esc(g)}</span><div class="g-track"><div class="g-fill" style="width:${Math.round(n/genres[0][1]*100)}%"></div></div><span class="g-cnt">${n}</span></div>`).join('')}</div>
       </div>
       <div class="stats-section"><div class="stats-h">📅 Decenni più ascoltati</div>
         <div class="decade-grid">${Object.entries(dec).sort((a,b)=>b[1]-a[1]).map(([d,n])=>`<div class="dec-card"><div class="dec-y">${d}s</div><div class="dec-n">${n} brani</div></div>`).join('')}</div>
@@ -361,80 +424,112 @@ async function loadStats(){
       <div class="stats-section"><div class="stats-h">📊 Riepilogo</div>
         <div class="sum-grid">
           <div class="sum-card"><div class="sum-val">${recMin}</div><div class="sum-lbl">Min. ascoltati (recenti)</div></div>
-          <div class="sum-card"><div class="sum-val">${bestTracks.length||0}</div><div class="sum-lbl">Top tracks</div></div>
-          <div class="sum-card"><div class="sum-val">${allArtists.length||0}</div><div class="sum-lbl">Artisti ascoltati</div></div>
+          <div class="sum-card"><div class="sum-val">${tL.items?.length||0}</div><div class="sum-lbl">Top tracks nel tempo</div></div>
+          <div class="sum-card"><div class="sum-val">${aL.items?.length||0}</div><div class="sum-lbl">Artisti ascoltati</div></div>
           <div class="sum-card"><div class="sum-val">${popAvg}</div><div class="sum-lbl">Popolarità media</div></div>
         </div>
       </div>
-      <div class="stats-section"><div class="stats-h">🏆 Top 10 tracks</div>
-        <div class="track-list">${bestTracks.slice(0,10).map((t,i)=>trackRow(t,i)).join('')}</div>
+      <div class="stats-section"><div class="stats-h">🏆 Top 10 di sempre</div>
+        <div class="track-list">${(tL.items||[]).slice(0,10).map((t,i)=>trackRow(t,i)).join('')}</div>
       </div>`;
-  }catch(err){ console.error('loadStats error:', err); c.innerHTML=emptyMsg('Impossibile caricare le statistiche'); }
+  }catch{ c.innerHTML=emptyMsg('Impossibile caricare le statistiche'); }
 }
 
 /* ══════════════════════════════════════════════════════
    AI — GEMINI SECTION (fully implemented)
 ══════════════════════════════════════════════════════ */
 function initAiSection() {
-  // If we already have results, just render them
-  if(S.ai.data){ renderAiResults(S.ai.data); return; }
-  // Otherwise show the prompt state
-  const out=$('aiOut');
-  out.innerHTML=`
+  if (S.ai.data) { renderAiResults(S.ai.data); return; }
+  const out = $('aiOut');
+  out.innerHTML = `
     <div class="ai-intro">
       <div class="ai-intro-icon">🤖</div>
       <h3>Raccomandazioni Personalizzate</h3>
-      <p>Gemini analizzerà i tuoi ascolti e ti consiglierà artisti e brani nuovi basandosi sui tuoi gusti.</p>
-      <p class="ai-note">Potrai anche creare una playlist Spotify con i brani consigliati in un click.</p>
+      <p>Gemini analizzerà i tuoi ascolti e ti suggerirà artisti e brani nuovi basandosi sui tuoi gusti musicali.</p>
+      <p class="ai-note">Puoi anche creare una playlist Spotify con i brani consigliati in un click.</p>
     </div>`;
 }
 
 async function generateAiRecommendations() {
-  const btn=$('aiGenBtn');
-  const out=$('aiOut');
-  btn.disabled=true; btn.textContent='✨ Generazione…';
-  out.innerHTML='<div class="spinner"></div><p style="text-align:center;color:var(--t3);font-size:.85rem;margin-top:.5rem">Gemini sta analizzando la tua musica…</p>';
+  const btn = $('aiGenBtn');
+  const out = $('aiOut');
+
+  btn.disabled = true;
+  btn.textContent = '✨ Generazione…';
+
+  out.innerHTML = `
+    <div class="spinner"></div>
+    <p style="text-align:center;color:var(--t3);font-size:.85rem;margin-top:.5rem">
+      Analisi dei tuoi gusti in corso…
+    </p>
+  `;
 
   try {
-    // Gather user data
-    const [ttR, taR] = await Promise.allSettled([
-      api('/api/top-tracks?time_range=medium_term&limit=20'),
-      api('/api/top-artists?time_range=medium_term&limit=20')
-    ]);
-    const topTracks  = ttR.status==='fulfilled' ? (ttR.value?.items||[]).map(t=>t.name+' - '+t.artists?.[0]?.name) : [];
-    const topArtists = taR.status==='fulfilled' ? (taR.value?.items||[]).map(a=>a.name) : [];
-    const genreMap   = {};
-    if(taR.status==='fulfilled')(taR.value?.items||[]).forEach(a=>(a.genres||[]).forEach(g=>{genreMap[g]=(genreMap[g]||0)+1;}));
-    const topGenres  = Object.entries(genreMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([g])=>g);
+    // 🔥 PRENDI TOP 3 REALI
+    const tt = await api('/api/top-tracks?time_range=short_term&limit=10');
 
-    const result = await api('/api/ai/recommend', {
-      method:'POST',
-      body: JSON.stringify({ topTracks, topArtists, topGenres })
+    const top3 = (tt.items || []).slice(0, 3);
+
+    const seeds = top3.map(t => ({
+      name: t.name,
+      artist: t.artists?.[0]?.name
+    }));
+
+    // 🔎 CERCA BRANI SIMILI (riusa search backend)
+    let suggestions = [];
+
+    for (const s of seeds) {
+      try {
+        const d = await api(`/api/search?q=${encodeURIComponent(s.name + ' ' + s.artist)}&limit=5`);
+        const found = d?.tracks?.items || [];
+
+        suggestions.push(
+          ...found.filter(f =>
+            f.name !== s.name // evita duplicati diretti
+          )
+        );
+      } catch (_) {}
+    }
+
+    // rimuovi duplicati
+    const unique = [];
+    const ids = new Set();
+
+    suggestions.forEach(t => {
+      if (t.id && !ids.has(t.id)) {
+        ids.add(t.id);
+        unique.push(t);
+      }
     });
 
-    S.ai.data = result;
-    renderAiResults(result);
-    toast('✨ Consigli AI generati!','ai');
-  } catch(e) {
-    if(e.message==='UNAUTH') return;
-    if(e.message==='gemini_not_configured'){
-      out.innerHTML=`<div class="ai-error-card">
-        <div class="ai-error-ico">⚠️</div>
-        <h3>Gemini non configurato</h3>
-        <p>Aggiungi la variabile <code>GEMINI_API_KEY</code> nelle impostazioni di Render.</p>
-        <p>Ottieni una chiave gratuita su <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a></p>
-      </div>`;
-    } else {
-      out.innerHTML=`<div class="ai-error-card">
-        <div class="ai-error-ico">❌</div>
-        <h3>Errore generazione</h3>
-        <p>${esc(e.message)}</p>
-        <button class="action-btn" onclick="generateAiRecommendations()" style="margin-top:1rem">Riprova</button>
-      </div>`;
+    const finalTracks = unique.slice(0, 10);
+
+    if (!finalTracks.length) {
+      out.innerHTML = emptyMsg('Nessun suggerimento trovato');
+      return;
     }
-    toast('Errore AI: '+e.message,'err',5000);
+
+    // 🎨 RENDER
+    out.innerHTML = `
+      <div class="ai-result">
+        <div class="ai-section">
+          <div class="ai-section-title">🎵 Consigliati per te</div>
+          <div class="track-list">
+            ${finalTracks.map((t, i) => trackRow(t, i)).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+
+    toast('✨ Suggerimenti generati!', 'ai');
+
+  } catch (e) {
+    console.error(e);
+    out.innerHTML = emptyMsg('Errore generazione AI');
+    toast('Errore AI', 'err');
   } finally {
-    btn.disabled=false; btn.textContent='✨ Genera Consigli';
+    btn.disabled = false;
+    btn.textContent = '✨ Genera Consigli';
   }
 }
 
