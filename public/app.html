@@ -201,35 +201,69 @@
     <section class="view" id="view-playlists">
       <div class="view-header">
         <h2>Playlist</h2>
+        <button class="plh-btn" onclick="S.cache.playlists=null;loadPlaylists()" title="Aggiorna">
+          <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        </button>
       </div>
+
+      <!-- Griglia -->
       <div class="playlist-grid" id="plGrid"></div>
+
+      <!-- Dettaglio -->
       <div id="plDetail" style="display:none">
-        <button class="back-btn" id="plBack">← Playlist</button>
-        <div class="pl-detail-head">
-          <img id="plDetailImg" src="" alt="" style="display:none" />
-          <h3 id="plDetailName"></h3>
+        <button class="plc-back-btn" id="plBack">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          Tutte le playlist
+        </button>
+        <div class="pld-head">
+          <div class="pld-cover">
+            <img id="pld-img" src="" alt="" style="display:none">
+            <div id="pld-noimg" class="pld-cover-ph" style="display:none">♫</div>
+          </div>
+          <div class="pld-head-info">
+            <div class="pld-label">Playlist</div>
+            <h2 class="pld-title" id="pld-name"></h2>
+            <div class="pld-meta" id="pld-meta"></div>
+          </div>
         </div>
-        <div class="track-list" id="plTrackList"></div>
+        <div class="track-list" id="pld-tracks"></div>
       </div>
     </section>
 
     <!-- SEARCH -->
     <section class="view" id="view-search">
-      <div class="view-header">
-        <h2>Cerca</h2>
+      <div class="view-header"><h2>Cerca</h2></div>
+
+      <!-- Barra ricerca -->
+      <div class="sr-bar-outer">
+        <div class="sr-bar">
+          <svg class="sr-bar-ico" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input type="text" class="sr-input" id="searchInput" placeholder="Cerca brani, artisti…" autocomplete="off" spellcheck="false"/>
+          <button class="sr-clear-btn" id="searchClear" style="display:none">
+            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </div>
+        <div class="sr-filters">
+          <button class="sr-filter active" data-f="all">Tutto</button>
+          <button class="sr-filter" data-f="track">Brani</button>
+          <button class="sr-filter" data-f="artist">Artisti</button>
+        </div>
       </div>
-      <div class="search-wrap">
-        <svg class="search-ico" viewBox="0 0 24 24">
-          <path
-            d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
-        </svg>
-        <input type="text" class="search-input" id="searchInput" placeholder="Cerca brani, artisti…"
-          autocomplete="off" />
-        <button class="search-clear" id="searchClear" style="display:none">✕</button>
+
+      <!-- Stato vuoto -->
+      <div class="sr-hint" id="srEmptyState">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <p class="sr-hint-title">Cerca la tua musica</p>
+        <p class="sr-hint-sub">Digita il nome di un brano o di un artista</p>
       </div>
-      <div id="searchResults"></div>
-      <div class="empty-hint" id="searchHint">
-        <p>Inizia a digitare per cercare</p>
+
+      <!-- Risultati lista -->
+      <div id="srResults" style="display:none"></div>
+
+      <!-- Pagina artista -->
+      <div id="srArtistDetail" style="display:none">
+        <div id="srArtistHero"></div>
+        <div id="srArtistBody"></div>
       </div>
     </section>
 
