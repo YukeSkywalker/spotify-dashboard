@@ -222,6 +222,33 @@ app.post('/api/playlists/:id/tracks', guard, async (req, res) => {
   } catch (e) { apiError(res, e); }
 });
 
+/* ── Artist top tracks — market=IT ──────────────────── */
+app.get('/api/artists/:id/top-tracks', guard, async (req, res) => {
+  try {
+    const data = await spotifyFetch(req.session,
+      `https://api.spotify.com/v1/artists/${req.params.id}/top-tracks?market=IT`);
+    res.json(data);
+  } catch (e) { apiError(res, e); }
+});
+
+/* ── Artist info ─────────────────────────────────────── */
+app.get('/api/artists/:id', guard, async (req, res) => {
+  try {
+    const data = await spotifyFetch(req.session,
+      `https://api.spotify.com/v1/artists/${req.params.id}`);
+    res.json(data);
+  } catch (e) { apiError(res, e); }
+});
+
+/* ── Artist albums ───────────────────────────────────── */
+app.get('/api/artists/:id/albums', guard, async (req, res) => {
+  try {
+    const data = await spotifyFetch(req.session,
+      `https://api.spotify.com/v1/artists/${req.params.id}/albums?market=IT&limit=20&include_groups=album,single`);
+    res.json(data);
+  } catch (e) { apiError(res, e); }
+});
+
 /* ── Search — market=IT (from_token è deprecato) ────── */
 app.get('/api/search', guard, async (req, res) => {
   const { q, limit = 20 } = req.query;
