@@ -8,6 +8,7 @@ const S = {
   cache:   { tt:{}, ta:{}, recent:null, playlists:null },
   player:  { uri:null, playing:false, poll:null },
   stimer:  null,
+  srFilter: 'all',
   ai:      { data:null, trackCache:{} }
 };
 
@@ -64,7 +65,7 @@ function nav(s) {
     'top-artists':()=>loadTA('short_term'),
     recent:       loadRecent,
     playlists:    loadPlaylists,
-    search:       ()=>setTimeout(()=>$('searchInput').focus(),80),
+    search:       ()=>setTimeout(()=>$('searchInput')?.focus(),80),
     stats:        loadStats,
     ai:           initAiSection,
     player:       loadPlayerPage
@@ -118,7 +119,6 @@ async function loadOverview() {
 
 function renderOvArtist(a) {
   const el=$('ovArtistCard'); if(!el||!a)return;
-  // followers.total is now always present thanks to server enrichment
   const fol = a.followers?.total != null ? fmtK(a.followers.total) + ' followers' : '';
   el.innerHTML=`<div class="ov-ac">
     <img src="${esc(a.images?.[0]?.url||'')}" alt="" onerror="this.style.display='none'"/>
@@ -137,7 +137,7 @@ function renderMiniTracks(el, tracks) {
   el.innerHTML=tracks.filter(Boolean).map((t,i)=>trackRow(t,i,{mini:true})).join('');
 }
 
-/* ── Track row ──────────────────────────────────────── */
+/* ── Track row (generico, usato ovunque tranne search) ─ */
 function trackRow(t, i, {ago=null, mini=false}={}) {
   if(!t)return'';
   const art=t.album?.images?.[0]?.url||'';
@@ -157,8 +157,8 @@ function trackRow(t, i, {ago=null, mini=false}={}) {
       ${!mini?`<div class="t-meta">
         <span class="t-alb">${esc(t.album?.name||'')}</span>
         ${ago?`<span class="t-when">${esc(ago)}</span>`:`<span class="t-dur">${fmtMs(t.duration_ms||0)}</span>`}
-      </div>`:''}
-    </div>`;
+      </div>`:''}`
+    +`</div>`;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -211,223 +211,418 @@ function renderRecent(items){
 }
 
 /* ══════════════════════════════════════════════════════
-   PLAYLISTS — FIX: tracks loading was crashing server-side
+   PLAYLISTS — riscritto da zero
 ══════════════════════════════════════════════════════ */
+
 async function loadPlaylists() {
-  if(S.cache.playlists){renderPlaylists(S.cache.playlists);return;}
-  $('plGrid').innerHTML=skelPlaylists(8);
-  showPlGrid();
-  try{ const d=await api('/api/playlists'); S.cache.playlists=d.items; renderPlaylists(d.items); }
-  catch{ $('plGrid').innerHTML=emptyMsg('Impossibile caricare le playlist'); }
-}
-function showPlGrid(){ $('plGrid').style.display='grid'; $('plDetail').style.display='none'; }
-function renderPlaylists(pls){
-  showPlGrid();
-  if(!pls?.length){$('plGrid').innerHTML=emptyMsg('Nessuna playlist');return;}
-  $('plGrid').innerHTML=pls.map(p=>`
-    <div class="pl-card" onclick="openPlaylist('${esc(p.id)}','${esc(p.name)}','${esc(p.images?.[0]?.url||'')}','${p.tracks?.total||0}')">
-      <div class="pl-img-wrap">
-        <img class="pl-img" src="${esc(p.images?.[0]?.url||'')}" alt="${esc(p.name)}" loading="lazy" onerror="this.style.display='none'"/>
-        <div class="pl-card-ov"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-      </div>
-      <div class="pl-info">
-        <div class="pl-name">${esc(p.name)}</div>
-        <div class="pl-cnt">${p.tracks?.total||0} brani · ${esc(p.owner?.display_name||'')}</div>
-      </div>
-    </div>`).join('');
+  plShowGrid();
+  if (S.cache.playlists) { renderPlaylists(S.cache.playlists); return; }
+  $('plGrid').innerHTML = skelPlaylists(12);
+  try {
+    const d = await api('/api/playlists');
+    S.cache.playlists = d.items || [];
+    renderPlaylists(S.cache.playlists);
+  } catch(e) {
+    $('plGrid').innerHTML = emptyMsg('Impossibile caricare le playlist');
+  }
 }
 
-async function openPlaylist(id, name, img, total) {
-  $('plGrid').style.display = 'none';
+function plShowGrid() {
+  $('plGrid').style.display   = 'grid';
+  $('plDetail').style.display = 'none';
+}
+
+function renderPlaylists(pls) {
+  plShowGrid();
+  if (!pls?.length) { $('plGrid').innerHTML = emptyMsg('Nessuna playlist trovata'); return; }
+  $('plGrid').innerHTML = pls.map(p => {
+    const img   = p.images?.[0]?.url || '';
+    const total = p.tracks?.total ?? 0;
+    const owner = esc(p.owner?.display_name || '');
+    const name  = esc(p.name || 'Playlist');
+    const id    = esc(p.id);
+    return `
+      <div class="plc" onclick="openPlaylist('${id}','${name}','${esc(img)}','${total}','${owner}')">
+        <div class="plc-img-wrap">
+          ${img
+            ? `<img class="plc-img" src="${esc(img)}" alt="${name}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=plc-noimg>\u266b</div>'">`
+            : `<div class="plc-noimg">\u266b</div>`
+          }
+          <div class="plc-overlay">
+            <div class="plc-play-btn">
+              <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="plc-info">
+          <div class="plc-name">${name}</div>
+          <div class="plc-meta">${total} brani${owner ? ' \u00b7 ' + owner : ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function openPlaylist(id, name, img, total, owner) {
+  $('plGrid').style.display   = 'none';
   $('plDetail').style.display = 'block';
-  $('plDetailName').textContent = name;
 
-  const ci = $('plDetailImg');
-  if (img) { ci.src = img; ci.style.display = 'block'; }
-  else      { ci.style.display = 'none'; }
-
-  $('plTrackList').innerHTML = skelRows(12);
+  /* ── Header ─────────────────────────────────────── */
+  const imgEl   = $('pld-img');
+  const noImgEl = $('pld-noimg');
+  if (img) { imgEl.src = img; imgEl.style.display = 'block'; noImgEl.style.display = 'none'; }
+  else      { imgEl.style.display = 'none'; noImgEl.style.display = 'flex'; }
+  $('pld-name').textContent = name;
+  $('pld-meta').textContent = `${total} brani${owner ? ' · ' + owner : ''}`;
+  $('pld-tracks').innerHTML = skelRows(12);
 
   try {
-    // ✅ FIX: chiama il backend con il parametro `id` corretto (non playlistId)
-    const d = await api(`/api/playlists/${id}/tracks`);
-
+    const d      = await api(`/api/playlists/${id}/tracks`);
     const tracks = (d.items || [])
-      .map(item => {
-        const t = item?.track;
-        if (!t || !t.name || !t.uri || !t.artists) return null;
-        return { name: t.name, uri: t.uri, duration_ms: t.duration_ms, album: t.album, artists: t.artists };
-      })
-      .filter(Boolean);
+      .map(item => item?.track)
+      .filter(t => t && t.uri && t.name && t.artists);
 
     if (!tracks.length) {
-      $('plTrackList').innerHTML = emptyMsg('Playlist vuota o brani non disponibili su Spotify');
+      $('pld-tracks').innerHTML = emptyMsg('Playlist vuota o brani non disponibili');
       return;
     }
+    /* aggiorna contatore reale */
+    $('pld-meta').textContent = `${tracks.length} brani${owner ? ' · ' + owner : ''}`;
+    $('pld-tracks').innerHTML = tracks.map((t, i) => trackRow(t, i)).join('');
 
-    $('plTrackList').innerHTML = tracks.map((t, i) => trackRow(t, i)).join('');
-
-  } catch (e) {
-    console.error('openPlaylist error:', e);
-    $('plTrackList').innerHTML = emptyMsg('Errore caricamento playlist');
+  } catch(e) {
+    console.error('openPlaylist:', e);
+    $('pld-tracks').innerHTML = emptyMsg('Errore nel caricamento dei brani');
   }
 }
 
 /* ══════════════════════════════════════════════════════
-   SEARCH — FIX: server was using undefined spFetch
+   SEARCH — riscritto da zero
 ══════════════════════════════════════════════════════ */
-function initSearch(){
-  const inp=$('searchInput'), clr=$('searchClear'), res=$('searchResults'), hint=$('searchHint');
-  inp.addEventListener('input',()=>{
-    const q=inp.value.trim();
-    clr.style.display=q?'block':'none';
-    clearTimeout(S.stimer);
-    if(!q){res.innerHTML='';hint.style.display='block';return;}
-    hint.style.display='none';
-    res.innerHTML=skelRows(6);
-    S.stimer=setTimeout(()=>doSearch(q),380);
+
+function initSearch() {
+  const inp = $('searchInput');
+  const clr = $('searchClear');
+
+  /* filtri tipo */
+  $$('.sr-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('.sr-filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      S.srFilter = btn.dataset.f;
+      const q = inp.value.trim();
+      if (q) doSearch(q);
+    });
   });
-  clr.addEventListener('click',()=>{ inp.value=''; clr.style.display='none'; res.innerHTML=''; hint.style.display='block'; inp.focus(); });
-  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&inp.value.trim()){ clearTimeout(S.stimer); doSearch(inp.value.trim()); } });
+
+  inp.addEventListener('input', () => {
+    const q = inp.value.trim();
+    clr.style.display = q ? 'flex' : 'none';
+    clearTimeout(S.stimer);
+    if (!q) { srShowEmpty(); return; }
+    srShowSkel();
+    S.stimer = setTimeout(() => doSearch(q), 360);
+  });
+
+  clr.addEventListener('click', () => {
+    inp.value = '';
+    clr.style.display = 'none';
+    srShowEmpty();
+    inp.focus();
+  });
+
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && inp.value.trim()) {
+      clearTimeout(S.stimer);
+      doSearch(inp.value.trim());
+    }
+  });
+}
+
+/* stati UI */
+function srShowEmpty() {
+  $('srEmptyState').style.display  = 'flex';
+  $('srResults').style.display     = 'none';
+  $('srArtistDetail').style.display= 'none';
+}
+function srShowResults() {
+  $('srEmptyState').style.display  = 'none';
+  $('srResults').style.display     = 'block';
+  $('srArtistDetail').style.display= 'none';
+}
+function srShowArtist() {
+  $('srEmptyState').style.display  = 'none';
+  $('srResults').style.display     = 'none';
+  $('srArtistDetail').style.display= 'block';
+}
+function srShowSkel() {
+  srShowResults();
+  $('srResults').innerHTML = `
+    <div class="sr-section">
+      <div class="sr-sec-label">Ricerca in corso…</div>
+      ${Array(6).fill(0).map(() => `
+        <div class="sr-track-row" style="pointer-events:none;opacity:.35">
+          <div class="skel" style="width:42px;height:42px;border-radius:6px;flex-shrink:0"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+            <div class="skel" style="height:12px;width:46%"></div>
+            <div class="skel" style="height:10px;width:28%"></div>
+          </div>
+        </div>`).join('')}
+    </div>`;
 }
 
 async function doSearch(q) {
-  const res = $('searchResults');
-
+  srShowResults();
   try {
-    const d = await api(`/api/search?q=${encodeURIComponent(q)}&limit=20`);
+    const d       = await api(`/api/search?q=${encodeURIComponent(q)}&limit=20`);
+    const tracks  = (d?.tracks?.items  || []).filter(t => t?.name && t?.uri && t?.artists);
+    const artists = (d?.artists?.items || []).filter(a => a?.name && a?.id);
 
-    const tracks  = d?.tracks?.items  || [];
-    const artists = d?.artists?.items || [];
+    /* applica filtro attivo */
+    const showTracks  = S.srFilter !== 'artist';
+    const showArtists = S.srFilter !== 'track';
 
-    if (!tracks.length && !artists.length) {
-      res.innerHTML = `<div class="empty">Nessun risultato per "<strong>${esc(q)}</strong>"</div>`;
+    if ((!tracks.length || !showTracks) && (!artists.length || !showArtists)) {
+      $('srResults').innerHTML = `
+        <div class="sr-noresult">
+          <div class="sr-noresult-ico">🔍</div>
+          <p>Nessun risultato per <strong>"${esc(q)}"</strong></p>
+        </div>`;
       return;
     }
 
     let html = '';
 
-    // Brani
-    if (tracks.length) {
-      html += `<div class="search-section-title">Brani</div>`;
-      html += tracks
-        .filter(t => t && t.name && t.artists)
-        .map((t, i) => trackRow(t, i))
-        .join('');
-    }
-
-    // Artisti — cliccabili per vedere i loro brani
-    if (artists.length) {
-      html += `<div class="search-section-title">Artisti</div>`;
-      html += artists.slice(0, 8).map(a => `
-        <div class="artist-search-item" onclick="openArtistResults('${esc(a.id)}','${esc(a.name)}','${esc(a.images?.[0]?.url||'')}')">
-          <img class="asi-img" src="${esc(a.images?.[0]?.url || '')}" onerror="this.style.display='none'"/>
-          <div>
-            <div class="asi-name">${esc(a.name)}</div>
-            <div class="asi-gen">${(a.genres || []).slice(0, 2).join(', ') || '—'}</div>
-          </div>
-          <div style="margin-left:auto;font-size:.7rem;color:var(--t3);flex-shrink:0">Top brani →</div>
+    /* ── ARTISTI ── */
+    if (artists.length && showArtists) {
+      html += `<div class="sr-section">
+        <div class="sr-sec-label">Artisti</div>
+        <div class="sr-artists-grid">
+          ${artists.slice(0, 8).map(a => {
+            const ph  = esc((a.name[0] || '?').toUpperCase());
+            const img = a.images?.[0]?.url || '';
+            return `
+            <div class="sr-artist-card" onclick="srOpenArtist('${esc(a.id)}','${esc(a.name)}','${esc(img)}','${esc((a.genres||[]).slice(0,1).join('')||'')}')">
+              <div class="sr-ac-wrap">
+                ${img
+                  ? `<img src="${esc(img)}" alt="${esc(a.name)}" onerror="this.parentElement.innerHTML='<div class=sr-ac-ph>${ph}</div>'">`
+                  : `<div class="sr-ac-ph">${ph}</div>`
+                }
+                <div class="sr-ac-hover"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+              </div>
+              <div class="sr-ac-name">${esc(a.name)}</div>
+              <div class="sr-ac-genre">${esc((a.genres||[]).slice(0,1).join('') || 'Artista')}</div>
+            </div>`;
+          }).join('')}
         </div>
-      `).join('');
+      </div>`;
     }
 
-    res.innerHTML = html;
+    /* ── BRANI ── */
+    if (tracks.length && showTracks) {
+      html += `<div class="sr-section">
+        <div class="sr-sec-label">Brani</div>
+        ${tracks.map((t, i) => srTrackRow(t, i)).join('')}
+      </div>`;
+    }
 
-  } catch (e) {
-    console.error('Search error:', e);
-    res.innerHTML = emptyMsg('Errore durante la ricerca');
+    $('srResults').innerHTML = html;
+
+  } catch(e) {
+    console.error('doSearch error:', e);
+    $('srResults').innerHTML = `
+      <div class="sr-noresult">
+        <div class="sr-noresult-ico">⚠️</div>
+        <p>Errore durante la ricerca. Riprova.</p>
+      </div>`;
   }
 }
 
-/* Mostra brani di un artista cliccato nella ricerca */
-async function openArtistResults(artistId, artistName, artistImg) {
-  const res = $('searchResults');
-  const currentQuery = $('searchInput').value;
-
-  res.innerHTML = `
-    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-      <button onclick="doSearch('${esc(currentQuery)}')"
-        style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);padding:.32em .75em;border-radius:20px;cursor:pointer;font-size:.8rem">
-        ← Indietro
-      </button>
-      ${artistImg ? `<img src="${esc(artistImg)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover"/>` : ''}
-      <div>
-        <div style="font-size:1rem;font-weight:700">${esc(artistName)}</div>
-        <div style="font-size:.75rem;color:var(--t3)">Caricamento brani…</div>
+/* Riga brano nella search */
+function srTrackRow(t, i) {
+  const art     = esc(t.album?.images?.[0]?.url || '');
+  const name    = esc(t.name);
+  const artists = esc((t.artists||[]).map(a=>a.name).join(', '));
+  const album   = esc(t.album?.name || '');
+  const dur     = fmtMs(t.duration_ms || 0);
+  const uri     = esc(t.uri);
+  const playing = S.player.uri === t.uri;
+  return `
+    <div class="sr-track-row${playing ? ' sr-playing' : ''}" onclick="playTrack('${uri}','${name}','${artists}','${art}')">
+      <div class="sr-tr-num">
+        ${playing
+          ? `<svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:var(--g)"><path d="M8 5v14l11-7z"/></svg>`
+          : i + 1}
       </div>
-    </div>
-    ${skelRows(8)}
-  `;
+      <div class="sr-tr-cover">
+        ${art ? `<img src="${art}" alt="" onerror="this.style.display='none'">` : `<div class="sr-tr-ph">\u266b</div>`}
+        <div class="sr-tr-hover"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+      </div>
+      <div class="sr-tr-info">
+        <div class="sr-tr-name${playing ? ' sr-green' : ''}">${name}</div>
+        <div class="sr-tr-sub">${artists}</div>
+      </div>
+      <div class="sr-tr-right">
+        <span class="sr-tr-album">${album}</span>
+        <span class="sr-tr-dur">${dur}</span>
+      </div>
+    </div>`;
+}
+
+/* Pagina artista */
+async function srOpenArtist(artistId, artistName, artistImg, artistGenre) {
+  srShowArtist();
+
+  /* hero */
+  $('srArtistHero').innerHTML = `
+    <button class="sr-back" onclick="srBackToResults()">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      Indietro
+    </button>
+    <div class="sr-ah-content">
+      ${artistImg
+        ? `<img class="sr-ah-img" src="${esc(artistImg)}" alt="${esc(artistName)}">`
+        : `<div class="sr-ah-img sr-ah-ph">${esc((artistName[0]||'?').toUpperCase())}</div>`
+      }
+      <div class="sr-ah-info">
+        <div class="sr-ah-label">Artista</div>
+        <h2 class="sr-ah-name">${esc(artistName)}</h2>
+        ${artistGenre ? `<div class="sr-ah-genre">${esc(artistGenre)}</div>` : ''}
+      </div>
+    </div>`;
+
+  /* brani */
+  $('srArtistBody').innerHTML = `
+    <div class="sr-sec-label" style="margin-bottom:.75rem">Top Brani</div>
+    ${skelRows(8)}`;
 
   try {
-    const d = await api(`/api/search?q=artist:${encodeURIComponent(artistName)}&limit=20`);
-    const tracks = (d?.tracks?.items || []).filter(t => t && t.name && t.artists);
+    const d      = await api(`/api/artists/${artistId}/top-tracks`);
+    const tracks = (d.tracks || []).filter(t => t?.uri && t?.name);
 
-    res.innerHTML = `
-      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-        <button onclick="doSearch('${esc(currentQuery)}')"
-          style="background:var(--s2);border:1px solid var(--b1);color:var(--t1);padding:.32em .75em;border-radius:20px;cursor:pointer;font-size:.8rem">
-          ← Indietro
-        </button>
-        ${artistImg ? `<img src="${esc(artistImg)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover"/>` : ''}
-        <div>
-          <div style="font-size:1rem;font-weight:700">${esc(artistName)}</div>
-          <div style="font-size:.75rem;color:var(--t3)">${tracks.length} brani trovati</div>
-        </div>
-      </div>
-      ${tracks.length
-        ? `<div class="track-list">${tracks.map((t, i) => trackRow(t, i)).join('')}</div>`
-        : emptyMsg('Nessun brano trovato per ' + esc(artistName))
-      }
-    `;
-  } catch (e) {
-    console.error('Artist tracks error:', e);
-    res.innerHTML += emptyMsg('Errore caricamento brani artista');
+    if (!tracks.length) {
+      $('srArtistBody').innerHTML = emptyMsg('Nessun brano trovato per questo artista');
+      return;
+    }
+    $('srArtistBody').innerHTML = `
+      <div class="sr-sec-label" style="margin-bottom:.75rem">Top Brani · ${tracks.length}</div>
+      ${tracks.map((t, i) => srTrackRow(t, i)).join('')}`;
+
+  } catch(e) {
+    console.error('srOpenArtist:', e);
+    $('srArtistBody').innerHTML = emptyMsg('Errore nel caricamento dei brani');
   }
+}
+
+function srBackToResults() {
+  const q = $('searchInput').value.trim();
+  if (q) { srShowResults(); }
+  else   { srShowEmpty(); }
+}
+
+/* Chiamato dall'AI section */
+function searchAndNav(q) {
+  nav('search');
+  setTimeout(() => {
+    const inp = $('searchInput');
+    if (!inp) return;
+    inp.value = q;
+    inp.dispatchEvent(new Event('input'));
+  }, 150);
 }
 
 /* ══════════════════════════════════════════════════════
-   STATS
+   STATS — generi fix + tutto il resto
 ══════════════════════════════════════════════════════ */
-async function loadStats(){
-  const c=$('statsContent'); if(!c)return;
-  c.innerHTML='<div class="spinner"></div>';
-  try{
-    const [tL,aL,rR]=await Promise.all([
+async function loadStats() {
+  const c = $('statsContent');
+  if (!c) return;
+  c.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const [tL, aL, rR] = await Promise.all([
       api('/api/top-tracks?time_range=long_term&limit=50'),
       api('/api/top-artists?time_range=long_term&limit=50'),
       api('/api/recent')
     ]);
-    const genreMap={};
-    (aL.items||[]).forEach(a=>(a.genres||[]).forEach(g=>{genreMap[g]=(genreMap[g]||0)+1;}));
-    const genres=Object.entries(genreMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
-    const dec={};
-    (tL.items||[]).forEach(t=>{const y=t.album?.release_date?.slice(0,4);if(y){const d=Math.floor(+y/10)*10;dec[d]=(dec[d]||0)+1;}});
-    const recMin=Math.round((rR.items||[]).reduce((a,i)=>a+(i.track?.duration_ms||0),0)/60000);
-    const popAvg=tL.items?.length?Math.round(tL.items.reduce((a,t)=>a+(t.popularity||0),0)/tL.items.length):0;
-    c.innerHTML=`
-      <div class="stats-section"><div class="stats-h">🎸 Generi preferiti</div>
-        <div class="genre-rows">${genres.map(([g,n])=>`<div class="g-row"><span class="g-lbl">${esc(g)}</span><div class="g-track"><div class="g-fill" style="width:${Math.round(n/genres[0][1]*100)}%"></div></div><span class="g-cnt">${n}</span></div>`).join('')}</div>
+
+    /* ── Generi: conta tutti i generi da tutti gli artisti ── */
+    const genreMap = {};
+    (aL.items || []).forEach(a => {
+      (a.genres || []).forEach(g => {
+        if (g) genreMap[g] = (genreMap[g] || 0) + 1;
+      });
+    });
+    const genres = Object.entries(genreMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+    const maxGenre = genres.length ? genres[0][1] : 1;  /* evita divisione per 0 */
+
+    /* ── Decenni ── */
+    const dec = {};
+    (tL.items || []).forEach(t => {
+      const y = t.album?.release_date?.slice(0, 4);
+      if (y) { const d = Math.floor(+y / 10) * 10; dec[d] = (dec[d] || 0) + 1; }
+    });
+
+    /* ── Riepilogo ── */
+    const recMin  = Math.round((rR.items || []).reduce((a, i) => a + (i.track?.duration_ms || 0), 0) / 60000);
+    const popAvg  = tL.items?.length ? Math.round(tL.items.reduce((a, t) => a + (t.popularity || 0), 0) / tL.items.length) : 0;
+    const uniqArt = new Set((tL.items || []).flatMap(t => (t.artists || []).map(a => a.id))).size;
+
+    c.innerHTML = `
+      <!-- Generi preferiti -->
+      <div class="stats-section">
+        <div class="stats-h">🎸 Generi preferiti</div>
+        ${genres.length
+          ? `<div class="genre-rows">
+              ${genres.map(([g, n]) => `
+                <div class="g-row">
+                  <span class="g-lbl">${esc(g)}</span>
+                  <div class="g-track"><div class="g-fill" style="width:${Math.round(n / maxGenre * 100)}%"></div></div>
+                  <span class="g-cnt">${n}</span>
+                </div>`).join('')}
+             </div>`
+          : `<p style="color:var(--t3);font-size:.88rem">Dati non disponibili — ascolta più musica con artisti che hanno generi su Spotify.</p>`
+        }
       </div>
-      <div class="stats-section"><div class="stats-h">📅 Decenni più ascoltati</div>
-        <div class="decade-grid">${Object.entries(dec).sort((a,b)=>b[1]-a[1]).map(([d,n])=>`<div class="dec-card"><div class="dec-y">${d}s</div><div class="dec-n">${n} brani</div></div>`).join('')}</div>
+
+      <!-- Decenni -->
+      <div class="stats-section">
+        <div class="stats-h">📅 Decenni più ascoltati</div>
+        <div class="decade-grid">
+          ${Object.entries(dec).sort((a, b) => b[1] - a[1]).map(([d, n]) => `
+            <div class="dec-card">
+              <div class="dec-y">${d}s</div>
+              <div class="dec-n">${n} brani</div>
+            </div>`).join('')}
+        </div>
       </div>
-      <div class="stats-section"><div class="stats-h">📊 Riepilogo</div>
+
+      <!-- Riepilogo -->
+      <div class="stats-section">
+        <div class="stats-h">📊 Riepilogo</div>
         <div class="sum-grid">
           <div class="sum-card"><div class="sum-val">${recMin}</div><div class="sum-lbl">Min. ascoltati (recenti)</div></div>
-          <div class="sum-card"><div class="sum-val">${tL.items?.length||0}</div><div class="sum-lbl">Top tracks nel tempo</div></div>
-          <div class="sum-card"><div class="sum-val">${aL.items?.length||0}</div><div class="sum-lbl">Artisti ascoltati</div></div>
+          <div class="sum-card"><div class="sum-val">${tL.items?.length || 0}</div><div class="sum-lbl">Top tracks nel tempo</div></div>
+          <div class="sum-card"><div class="sum-val">${uniqArt}</div><div class="sum-lbl">Artisti unici</div></div>
           <div class="sum-card"><div class="sum-val">${popAvg}</div><div class="sum-lbl">Popolarità media</div></div>
         </div>
       </div>
-      <div class="stats-section"><div class="stats-h">🏆 Top 10 di sempre</div>
-        <div class="track-list">${(tL.items||[]).slice(0,10).map((t,i)=>trackRow(t,i)).join('')}</div>
+
+      <!-- Top 10 -->
+      <div class="stats-section">
+        <div class="stats-h">🏆 Top 10 di sempre</div>
+        <div class="track-list">${(tL.items || []).slice(0, 10).map((t, i) => trackRow(t, i)).join('')}</div>
       </div>`;
-  }catch{ c.innerHTML=emptyMsg('Impossibile caricare le statistiche'); }
+
+  } catch(e) {
+    console.error('loadStats:', e);
+    c.innerHTML = emptyMsg('Impossibile caricare le statistiche');
+  }
 }
 
 /* ══════════════════════════════════════════════════════
-   AI — GEMINI SECTION (fully implemented)
+   AI — GEMINI SECTION
 ══════════════════════════════════════════════════════ */
 function initAiSection() {
   if (S.ai.data) { renderAiResults(S.ai.data); return; }
@@ -452,68 +647,37 @@ async function generateAiRecommendations() {
     <div class="spinner"></div>
     <p style="text-align:center;color:var(--t3);font-size:.85rem;margin-top:.5rem">
       Analisi dei tuoi gusti in corso…
-    </p>
-  `;
+    </p>`;
 
   try {
-    // 🔥 PRENDI TOP 3 REALI
     const tt = await api('/api/top-tracks?time_range=short_term&limit=10');
-
     const top3 = (tt.items || []).slice(0, 3);
+    const seeds = top3.map(t => ({ name: t.name, artist: t.artists?.[0]?.name }));
 
-    const seeds = top3.map(t => ({
-      name: t.name,
-      artist: t.artists?.[0]?.name
-    }));
-
-    // 🔎 CERCA BRANI SIMILI (riusa search backend)
     let suggestions = [];
-
     for (const s of seeds) {
       try {
         const d = await api(`/api/search?q=${encodeURIComponent(s.name + ' ' + s.artist)}&limit=5`);
-        const found = d?.tracks?.items || [];
-
-        suggestions.push(
-          ...found.filter(f =>
-            f.name !== s.name // evita duplicati diretti
-          )
-        );
+        suggestions.push(...(d?.tracks?.items || []).filter(f => f.name !== s.name));
       } catch (_) {}
     }
 
-    // rimuovi duplicati
     const unique = [];
     const ids = new Set();
-
-    suggestions.forEach(t => {
-      if (t.id && !ids.has(t.id)) {
-        ids.add(t.id);
-        unique.push(t);
-      }
-    });
-
+    suggestions.forEach(t => { if (t.id && !ids.has(t.id)) { ids.add(t.id); unique.push(t); } });
     const finalTracks = unique.slice(0, 10);
 
-    if (!finalTracks.length) {
-      out.innerHTML = emptyMsg('Nessun suggerimento trovato');
-      return;
-    }
+    if (!finalTracks.length) { out.innerHTML = emptyMsg('Nessun suggerimento trovato'); return; }
 
-    // 🎨 RENDER
     out.innerHTML = `
       <div class="ai-result">
         <div class="ai-section">
           <div class="ai-section-title">🎵 Consigliati per te</div>
-          <div class="track-list">
-            ${finalTracks.map((t, i) => trackRow(t, i)).join('')}
-          </div>
+          <div class="track-list">${finalTracks.map((t, i) => trackRow(t, i)).join('')}</div>
         </div>
-      </div>
-    `;
+      </div>`;
 
     toast('✨ Suggerimenti generati!', 'ai');
-
   } catch (e) {
     console.error(e);
     out.innerHTML = emptyMsg('Errore generazione AI');
@@ -525,13 +689,12 @@ async function generateAiRecommendations() {
 }
 
 function renderAiResults(data) {
-  const out=$('aiOut');
-  const tracks = (data.recommendations||[]).filter(r=>r.type==='track');
+  const out = $('aiOut');
+  const tracks  = (data.recommendations||[]).filter(r=>r.type==='track');
   const artists = (data.recommendations||[]).filter(r=>r.type==='artist');
 
   out.innerHTML=`
     <div class="ai-result">
-      <!-- Header card -->
       <div class="ai-header-card">
         <div class="ai-header-top">
           <div class="ai-mood-pill">🎵 ${esc(data.mood||'Il tuo vibe')}</div>
@@ -541,7 +704,6 @@ function renderAiResults(data) {
         ${data.playlist_name?`<div class="ai-pl-suggestion">💿 Playlist suggerita: <strong>"${esc(data.playlist_name)}"</strong></div>`:''}
       </div>
 
-      <!-- Recommended Artists -->
       ${artists.length?`
       <div class="ai-section">
         <div class="ai-section-title">👤 Artisti consigliati</div>
@@ -559,7 +721,6 @@ function renderAiResults(data) {
         </div>
       </div>`:''}
 
-      <!-- Recommended Tracks -->
       ${tracks.length?`
       <div class="ai-section">
         <div class="ai-section-title">🎵 Brani consigliati</div>
@@ -567,9 +728,7 @@ function renderAiResults(data) {
           ${tracks.map((t,i)=>`
             <div class="ai-track-item" id="ait-${i}">
               <div class="ai-track-num">${i+1}</div>
-              <div class="ai-track-art" id="ait-art-${i}">
-                <span class="ai-track-art-ph">♫</span>
-              </div>
+              <div class="ai-track-art" id="ait-art-${i}"><span class="ai-track-art-ph">♫</span></div>
               <div class="ai-track-det">
                 <div class="ai-track-name">${esc(t.name)}</div>
                 <div class="ai-track-artist">${esc(t.artist||'')}</div>
@@ -585,8 +744,6 @@ function renderAiResults(data) {
               </div>
             </div>`).join('')}
         </div>
-
-        <!-- Create Playlist Button -->
         <div class="ai-create-pl-wrap">
           <button class="ai-create-pl-btn" id="aiCreatePlBtn" onclick="createAiPlaylist()">
             <svg viewBox="0 0 24 24"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
@@ -597,8 +754,7 @@ function renderAiResults(data) {
       </div>`:''}
     </div>`;
 
-  // Asynchronously load track art & URIs
-  if(tracks.length) loadAiTrackData(tracks);
+  if (tracks.length) loadAiTrackData(tracks);
 }
 
 async function loadAiTrackData(tracks) {
@@ -606,84 +762,48 @@ async function loadAiTrackData(tracks) {
     const t=tracks[i];
     try{
       const d=await api(`/api/search-uri?track=${encodeURIComponent(t.name)}&artist=${encodeURIComponent(t.artist||'')}`);
-      if(d && d.found){
-        // Store URI for playback
-        S.ai.trackCache[i]={uri:d.uri, name:d.name, artist:d.artist, art:d.album_art};
-        // Update art
+      if(d&&d.found){
+        S.ai.trackCache[i]={uri:d.uri,name:d.name,artist:d.artist,art:d.album_art};
         const artEl=$(`ait-art-${i}`);
-        if(artEl && d.album_art){
-          artEl.innerHTML=`<img src="${esc(d.album_art)}" alt="" onerror="this.innerHTML='♫'"/>`;
-        }
+        if(artEl&&d.album_art) artEl.innerHTML=`<img src="${esc(d.album_art)}" alt="" onerror="this.innerHTML='♫'"/>`;
       }
-    } catch(_){ /* best effort */ }
+    } catch(_){}
   }
 }
 
 async function aiPlayTrack(idx, name, artist) {
   const cached=S.ai.trackCache[idx];
-  if(cached && cached.uri){
-    await playTrack(cached.uri, cached.name||name, cached.artist||artist, cached.art||'');
-  } else {
-    // Try to find it now
+  if(cached?.uri){ await playTrack(cached.uri,cached.name||name,cached.artist||artist,cached.art||''); }
+  else{
     try{
       const d=await api(`/api/search-uri?track=${encodeURIComponent(name)}&artist=${encodeURIComponent(artist)}`);
-      if(d && d.found){
-        S.ai.trackCache[idx]={uri:d.uri,name:d.name,artist:d.artist,art:d.album_art};
-        await playTrack(d.uri, d.name, d.artist, d.album_art||'');
-      } else {
-        toast('Brano non trovato su Spotify','warn');
-      }
+      if(d&&d.found){ S.ai.trackCache[idx]={uri:d.uri,name:d.name,artist:d.artist,art:d.album_art}; await playTrack(d.uri,d.name,d.artist,d.album_art||''); }
+      else toast('Brano non trovato su Spotify','warn');
     } catch(e){ toast('Impossibile trovare il brano','warn'); }
   }
 }
 
 async function createAiPlaylist() {
-  if(!S.ai.data) return;
-  const btn=$('aiCreatePlBtn');
-  if(!btn) return;
+  if(!S.ai.data)return;
+  const btn=$('aiCreatePlBtn'); if(!btn)return;
   btn.disabled=true; btn.textContent='⏳ Creazione…';
-
   try{
     const tracks=(S.ai.data.recommendations||[]).filter(r=>r.type==='track');
     const plName=S.ai.data.playlist_name||'AI Consigli Melodia';
-
-    // Collect URIs (use cache or search)
     const uris=[];
     for(let i=0;i<tracks.length;i++){
       const cached=S.ai.trackCache[i];
-      if(cached?.uri){ uris.push(cached.uri); continue; }
-      try{
-        const d=await api(`/api/search-uri?track=${encodeURIComponent(tracks[i].name)}&artist=${encodeURIComponent(tracks[i].artist||'')}`);
-        if(d?.found){ uris.push(d.uri); S.ai.trackCache[i]={uri:d.uri,name:d.name,artist:d.artist,art:d.album_art}; }
-      } catch(_){}
+      if(cached?.uri){uris.push(cached.uri);continue;}
+      try{ const d=await api(`/api/search-uri?track=${encodeURIComponent(tracks[i].name)}&artist=${encodeURIComponent(tracks[i].artist||'')}`); if(d?.found){uris.push(d.uri);S.ai.trackCache[i]={uri:d.uri,name:d.name,artist:d.artist,art:d.album_art};} }catch(_){}
     }
-
-    if(!uris.length){ toast('Nessun brano trovato su Spotify','warn'); return; }
-
-    // Create playlist
+    if(!uris.length){toast('Nessun brano trovato su Spotify','warn');return;}
     const pl=await api('/api/playlists',{method:'POST',body:JSON.stringify({name:plName,description:'Creata da Melodia AI con Gemini'})});
-    // Add tracks
     await api(`/api/playlists/${pl.id}/tracks`,{method:'POST',body:JSON.stringify({uris})});
-
-    // Invalidate playlists cache
     S.cache.playlists=null;
-
     toast(`✅ Playlist "${plName}" creata con ${uris.length} brani!`,'ok',5000);
-    btn.textContent='✅ Playlist creata!';
-    btn.style.background='var(--g)';
+    btn.textContent='✅ Playlist creata!'; btn.style.background='var(--g)';
     setTimeout(()=>{btn.disabled=false;btn.textContent='Crea Playlist su Spotify';btn.style.background='';},4000);
-  } catch(e){
-    toast('Errore creazione playlist: '+e.message,'err');
-    btn.disabled=false; btn.textContent='Crea Playlist su Spotify';
-  }
-}
-
-function searchAndNav(q) {
-  nav('search');
-  setTimeout(()=>{
-    const inp=$('searchInput');
-    if(inp){ inp.value=q; inp.dispatchEvent(new Event('input')); }
-  },150);
+  } catch(e){ toast('Errore creazione playlist: '+e.message,'err'); btn.disabled=false; btn.textContent='Crea Playlist su Spotify'; }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -790,7 +910,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 ══════════════════════════════════════════════════════ */
 function skelRows(n){ return Array(n).fill(0).map(()=>`<div class="track-item" style="pointer-events:none;opacity:.4"><div class="skel" style="width:18px;height:13px;flex-shrink:0"></div><div class="skel" style="width:40px;height:40px;border-radius:5px;flex-shrink:0"></div><div style="flex:1;display:flex;flex-direction:column;gap:5px;min-width:0"><div class="skel" style="height:12px;width:52%"></div><div class="skel" style="height:10px;width:34%"></div></div><div class="skel" style="width:35px;height:10px;flex-shrink:0"></div></div>`).join(''); }
 function skelArtists(n){ return `<div class="artist-grid">${Array(n).fill(0).map(()=>`<div class="artist-card" style="pointer-events:none;opacity:.4"><div class="skel" style="width:78px;height:78px;border-radius:50%;margin:0 auto .6rem"></div><div class="skel" style="height:12px;width:70%;margin:0 auto 5px"></div><div class="skel" style="height:10px;width:50%;margin:0 auto"></div></div>`).join('')}</div>`; }
-function skelPlaylists(n){ return Array(n).fill(0).map(()=>`<div class="pl-card" style="pointer-events:none;opacity:.4"><div class="skel" style="width:100%;aspect-ratio:1;border-radius:0"></div><div style="padding:.75rem .85rem;display:flex;flex-direction:column;gap:5px"><div class="skel" style="height:12px;width:68%"></div><div class="skel" style="height:10px;width:42%"></div></div></div>`).join(''); }
+function skelPlaylists(n){ return Array(n).fill(0).map(()=>`<div class="plc" style="pointer-events:none;opacity:.4"><div class="plc-img-wrap"><div class="skel" style="width:100%;aspect-ratio:1"></div></div><div class="plc-info"><div class="skel" style="height:12px;width:68%;margin-bottom:6px"></div><div class="skel" style="height:10px;width:42%"></div></div></div>`).join(''); }
 function emptyMsg(msg){ return `<div class="empty">⚠ ${msg}</div>`; }
 
 /* ══════════════════════════════════════════════════════
@@ -805,7 +925,7 @@ function initEvents(){
   $('pbPlay').addEventListener('click',togglePlay);
   $('pbNext').addEventListener('click',playerNext);
   $('pbPrev').addEventListener('click',playerPrev);
-  $('plBack').addEventListener('click',()=>{ if(S.cache.playlists)renderPlaylists(S.cache.playlists); });
+  $('plBack')?.addEventListener('click',()=>{ if(S.cache.playlists)renderPlaylists(S.cache.playlists); else plShowGrid(); });
   $('aiGenBtn')?.addEventListener('click', generateAiRecommendations);
   $$('#ttTabs .tab').forEach(b=>b.addEventListener('click',()=>{ $$('#ttTabs .tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); loadTT(b.dataset.r); }));
   $$('#taTabs .tab').forEach(b=>b.addEventListener('click',()=>{ $$('#taTabs .tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); loadTA(b.dataset.r); }));
