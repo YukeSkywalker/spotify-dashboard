@@ -13,25 +13,18 @@
 <body>
 
   <!-- ══ SIDEBAR ══════════════════════════════════════════════════ -->
-  <!--
-    La sidebar è il menu di navigazione principale.
-    Su mobile si trasforma in un drawer laterale attivato dal bottone hamburger.
-    Contiene: logo, profilo utente, voci di menu, bottone logout.
-  -->
   <aside class="sidebar" id="sidebar">
-
-    <!-- Logo + bottone tema -->
     <div class="sb-head">
       <div class="sb-logo">
         <svg viewBox="0 0 24 24">
-          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.622.622 0 0 1 .207.857zm1.223-2.722a.779.779 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 0 1-.973-.517.779.779 0 0 1 .517-.972c3.632-1.102 8.147-.569 11.236 1.326a.779.779 0 0 1 .257 1.072zm.105-2.835C14.69 8.956 9.365 8.773 6.18 9.747a.935.935 0 1 1-.543-1.79c3.632-1.102 9.67-.89 13.48 1.401a.935.935 0 0 1-.203 1.71z" />
+          <path
+            d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.622.622 0 0 1 .207.857zm1.223-2.722a.779.779 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 0 1-.973-.517.779.779 0 0 1 .517-.972c3.632-1.102 8.147-.569 11.236 1.326a.779.779 0 0 1 .257 1.072zm.105-2.835C14.69 8.956 9.365 8.773 6.18 9.747a.935.935 0 1 1-.543-1.79c3.632-1.102 9.67-.89 13.48 1.401a.935.935 0 0 1-.203 1.71z" />
         </svg>
         <span>Melodia</span>
       </div>
-      <button class="theme-btn" id="themeBtn" title="Cambia tema">☀</button>
+      <button class="theme-btn" id="themeBtn" title="Tema">☀</button>
     </div>
 
-    <!-- Profilo utente (popolato da renderUser() in app.js) -->
     <div class="sb-user" id="sbUser">
       <div class="sb-avatar-wrap">
         <img id="sbAvatar" src="" alt="" style="display:none" />
@@ -43,86 +36,65 @@
       </div>
     </div>
 
-    <!-- Voci di navigazione
-         data-s = ID sezione, usato da nav() in app.js per il routing -->
     <nav class="sb-nav">
-
-      <!-- Panoramica -->
       <button class="nav-item active" data-s="overview">
         <svg viewBox="0 0 24 24">
           <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
         </svg>
         Panoramica
       </button>
-
-      <!-- Top Tracks -->
       <button class="nav-item" data-s="top-tracks">
         <svg viewBox="0 0 24 24">
           <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
         </svg>
         Top Tracks
       </button>
-
-      <!-- Top Artists -->
       <button class="nav-item" data-s="top-artists">
         <svg viewBox="0 0 24 24">
-          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+          <path
+            d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
         </svg>
         Top Artists
       </button>
-
-      <!-- Recenti -->
       <button class="nav-item" data-s="recent">
         <svg viewBox="0 0 24 24">
-          <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
+          <path
+            d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
         </svg>
         Recenti
       </button>
 
-      <!-- NOTE: Sezioni "Cerca" e "Playlist" rimosse perché non funzionanti -->
-
-      <!-- Statistiche (include l'analisi generi con Gemini) -->
       <button class="nav-item" data-s="stats">
         <svg viewBox="0 0 24 24">
-          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+          <path
+            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
         </svg>
         Statistiche
       </button>
 
-      <!-- AI Consigli (raccomandazioni Gemini) -->
-      <button class="nav-item" data-s="ai">
-        <svg viewBox="0 0 24 24">
+      <button class="nav-item" data-s="ai"><svg viewBox="0 0 24 24">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
-        </svg>
-        AI Consigli
-        <span class="ai-badge">Gemini</span>
-      </button>
+        </svg>AI Consigli<span class="ai-badge">Gemini</span></button>
 
-      <!-- In Riproduzione (player page) -->
       <button class="nav-item" data-s="player">
         <svg viewBox="0 0 24 24">
-          <path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z" />
+          <path
+            d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z" />
         </svg>
         In Riproduzione
       </button>
-
     </nav>
 
-    <!-- Bottone logout -->
     <button class="sb-logout" id="logoutBtn">
       <svg viewBox="0 0 24 24">
-        <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+        <path
+          d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
       </svg>
       Logout
     </button>
-
   </aside>
 
   <!-- ══ MOBILE HEADER ════════════════════════════════════════════ -->
-  <!--
-    Header visibile solo su schermi mobili (< 780px).
-    Contiene hamburger menu, titolo app e toggle tema.
-  -->
   <header class="mob-header">
     <button class="mob-menu" id="mobMenu">
       <svg viewBox="0 0 24 24">
@@ -133,23 +105,15 @@
     <button class="mob-theme" id="mobTheme">☀</button>
   </header>
 
-  <!-- ══ MAIN — Area contenuto principale ═════════════════════════ -->
+  <!-- ══ MAIN ═════════════════════════════════════════════════════ -->
   <main class="main-area">
 
-    <!-- ── PANORAMICA ──────────────────────────────────────────── -->
-    <!--
-      Schermata principale con:
-      - 4 stat box (top tracks, artisti, playlist, minuti)
-      - Card artista #1
-      - Due colonne: top 5 tracks | recenti
-    -->
+    <!-- OVERVIEW -->
     <section class="view active" id="view-overview">
       <div class="view-header">
         <h2>Panoramica</h2>
         <p class="view-sub">Bentornato, <strong id="ovName">—</strong></p>
       </div>
-
-      <!-- Stat boxes: numeri di riepilogo rapidi -->
       <div class="stat-row" id="statRow">
         <div class="stat-box">
           <div class="stat-ico">♫</div>
@@ -172,11 +136,7 @@
           <div class="stat-lbl">Min. ascoltati</div>
         </div>
       </div>
-
-      <!-- Card artista #1 (popolata da renderOvArtist()) -->
       <div class="ov-artist-card" id="ovArtistCard"></div>
-
-      <!-- Due colonne: top 5 tracks e recenti (popolate da renderMiniTracks()) -->
       <div class="ov-cols">
         <div>
           <div class="col-label">Top 5 Tracks</div>
@@ -189,15 +149,10 @@
       </div>
     </section>
 
-    <!-- ── TOP TRACKS ──────────────────────────────────────────── -->
-    <!--
-      Lista delle top 50 tracks con 3 range temporali selezionabili via tab.
-      loadTT() è chiamata al cambio tab e al primo accesso alla sezione.
-    -->
+    <!-- TOP TRACKS -->
     <section class="view" id="view-top-tracks">
       <div class="view-header">
         <h2>Top Tracks</h2>
-        <!-- Tab per selezionare il periodo: data-r è passato a loadTT() -->
         <div class="tabs" id="ttTabs">
           <button class="tab active" data-r="short_term">4 sett.</button>
           <button class="tab" data-r="medium_term">6 mesi</button>
@@ -207,11 +162,7 @@
       <div class="track-list" id="ttList"></div>
     </section>
 
-    <!-- ── TOP ARTISTS ─────────────────────────────────────────── -->
-    <!--
-      Griglia dei top 50 artisti con 3 range temporali.
-      Ogni card mostra: rank, foto, nome, generi, popolarità.
-    -->
+    <!-- TOP ARTISTS -->
     <section class="view" id="view-top-artists">
       <div class="view-header">
         <h2>Top Artists</h2>
@@ -224,10 +175,7 @@
       <div class="artist-grid" id="taList"></div>
     </section>
 
-    <!-- ── RECENTI ─────────────────────────────────────────────── -->
-    <!--
-      Ultimi 50 brani ascoltati con indicazione temporale ("5m fa").
-    -->
+    <!-- RECENT -->
     <section class="view" id="view-recent">
       <div class="view-header">
         <h2>Recenti</h2>
@@ -236,60 +184,35 @@
       <div class="track-list" id="recentList"></div>
     </section>
 
-    <!-- ── STATISTICHE ─────────────────────────────────────────── -->
-    <!--
-      Analisi approfondita dei gusti musicali.
-      Il contenuto è generato dinamicamente da loadStats() in app.js.
-
-      Struttura (iniettata via JS):
-      1. 🎸 Generi preferiti  — analisi Gemini AI (top 3 con barre)
-      2. 📅 Decenni           — distribuzione per decennio
-      3. 📊 Riepilogo         — numeri chiave
-      4. 🏆 Top 10 di sempre  — brani con player
-    -->
+    <!-- STATS -->
     <section class="view" id="view-stats">
       <div class="view-header">
         <h2>Statistiche</h2>
         <p class="view-sub">La tua musica analizzata</p>
       </div>
-      <!-- Contenuto iniettato da loadStats() + loadGeminiGenres() -->
       <div id="statsContent"></div>
     </section>
 
-    <!-- ── AI CONSIGLI ─────────────────────────────────────────── -->
-    <!--
-      Sezione Gemini AI per raccomandazioni personalizzate.
-      Il bottone "Genera Consigli" chiama generateAiRecommendations().
-      I risultati includono: mood, summary, artisti e brani suggeriti.
-    -->
-    <section class="view" id="view-ai">
-      <!-- Header con bottone di generazione -->
-      <div class="vh">
-        <div>
-          <h2>AI Consigli <span class="ai-badge-lg">Gemini</span></h2>
-          <p class="vsub">Raccomandazioni personalizzate basate sui tuoi gusti</p>
-        </div>
-        <button class="ai-gen-btn" id="aiGenBtn">✨ Genera Consigli</button>
-      </div>
+    <!-- AI -->
+<section class="view" id="view-ai">
+  <div class="vh">
+    <div>
+      <h2>AI Consigli <span class="ai-badge-lg">Gemini</span></h2>
+      <p class="vsub">Raccomandazioni personalizzate basate sui tuoi gusti</p>
+    </div>
+    <button class="ai-gen-btn" id="aiGenBtn">✨ Genera Consigli</button>
+  </div>
+  <div id="aiOut">
+    <div class="ai-intro">
+      <div class="ai-intro-icon">🤖</div>
+      <h3>Raccomandazioni Personalizzate</h3>
+      <p>Gemini analizzerà i tuoi ascolti e ti suggerirà artisti e brani nuovi basandosi sui tuoi gusti musicali.</p>
+      <p class="ai-note">Puoi anche creare una playlist Spotify con i brani consigliati in un click.</p>
+    </div>
+  </div>
+</section>
 
-      <!-- Contenuto dinamico: stato iniziale = messaggio introduttivo
-           Dopo la generazione = risultati con artisti, brani, bottone playlist -->
-      <div id="aiOut">
-        <div class="ai-intro">
-          <div class="ai-intro-icon">🤖</div>
-          <h3>Raccomandazioni Personalizzate</h3>
-          <p>Gemini analizzerà i tuoi ascolti e ti suggerirà artisti e brani nuovi basandosi sui tuoi gusti musicali.</p>
-          <p class="ai-note">Puoi anche creare una playlist Spotify con i brani consigliati in un click.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── IN RIPRODUZIONE ─────────────────────────────────────── -->
-    <!--
-      Vista estesa del player con copertina grande, progressione,
-      informazioni complete e controlli.
-      Contenuto generato da loadPlayerPage().
-    -->
+    <!-- PLAYER -->
     <section class="view" id="view-player">
       <div class="view-header">
         <h2>In Riproduzione</h2>
@@ -300,18 +223,8 @@
 
   </main>
 
-  <!-- ══ PLAYER BAR — Barra fissa in basso ════════════════════════ -->
-  <!--
-    Barra di riproduzione sempre visibile (sopra il content, fissa al bottom).
-    Componenti:
-    - pb-track: copertina + titolo + artista
-    - pb-center: controlli play/pause/skip + barra progresso
-    - pb-right: volume slider + link Spotify
-    Aggiornata da updatePB() e pollPlayer() in app.js.
-  -->
+  <!-- ══ PLAYER BAR ════════════════════════════════════════════════ -->
   <div class="player-bar" id="playerBar">
-
-    <!-- Brano corrente -->
     <div class="pb-track">
       <img class="pb-art" id="pbArt" src="" alt="" style="display:none" />
       <div class="pb-art-ph" id="pbArtPh">♫</div>
@@ -320,29 +233,27 @@
         <div class="pb-artist" id="pbArtist">—</div>
       </div>
     </div>
-
-    <!-- Controlli centrali + barra avanzamento -->
     <div class="pb-center">
       <div class="pb-ctrls">
         <button class="pb-btn" id="pbPrev" title="Precedente">
-          <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+          </svg>
         </button>
         <button class="pb-btn pb-play" id="pbPlay" title="Play/Pausa">
-          <!-- Icona play (visibile quando in pausa) -->
           <svg class="ico-play" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
           </svg>
-          <!-- Icona pausa (visibile quando in riproduzione) -->
           <svg class="ico-pause" viewBox="0 0 24 24" style="display:none">
             <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
           </svg>
         </button>
         <button class="pb-btn" id="pbNext" title="Successivo">
-          <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+          </svg>
         </button>
       </div>
-
-      <!-- Tempo trascorso + barra + tempo totale -->
       <div class="pb-prog-wrap">
         <span class="pb-time" id="pbElapsed">0:00</span>
         <div class="pb-prog" id="pbProg">
@@ -351,32 +262,26 @@
         <span class="pb-time" id="pbTotal">0:00</span>
       </div>
     </div>
-
-    <!-- Volume + link a Spotify -->
     <div class="pb-right">
       <div class="pb-vol">
         <svg viewBox="0 0 24 24">
           <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
         </svg>
-        <!-- Slider volume: aggiorna tramite PUT /api/volume con debounce 300ms -->
         <input type="range" id="pbVol" min="0" max="100" value="80" />
       </div>
       <a class="pb-spotify" href="https://open.spotify.com" target="_blank" title="Apri Spotify">
         <svg viewBox="0 0 24 24">
-          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.622.622 0 0 1 .207.857zm1.223-2.722a.779.779 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 0 1-.973-.517.779.779 0 0 1 .517-.972c3.632-1.102 8.147-.569 11.236 1.326a.779.779 0 0 1 .257 1.072zm.105-2.835C14.69 8.956 9.365 8.773 6.18 9.747a.935.935 0 1 1-.543-1.79c3.632-1.102 9.67-.89 13.48 1.401a.935.935 0 0 1-.203 1.71z" />
+          <path
+            d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.622.622 0 0 1 .207.857zm1.223-2.722a.779.779 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.779.779 0 0 1-.973-.517.779.779 0 0 1 .517-.972c3.632-1.102 8.147-.569 11.236 1.326a.779.779 0 0 1 .257 1.072zm.105-2.835C14.69 8.956 9.365 8.773 6.18 9.747a.935.935 0 1 1-.543-1.79c3.632-1.102 9.67-.89 13.48 1.401a.935.935 0 0 1-.203 1.71z" />
         </svg>
       </a>
     </div>
-
   </div>
 
-  <!-- ══ OVERLAY e TOAST ═══════════════════════════════════════════ -->
-  <!-- Overlay scuro per sidebar mobile -->
+  <!-- ══ OVERLAYS ══════════════════════════════════════════════════ -->
   <div class="overlay" id="overlay"></div>
-  <!-- Notifiche temporanee (gestite da toast() in app.js) -->
   <div class="toast" id="toast"></div>
 
-  <!-- Script principale dell'app -->
   <script src="/app.js"></script>
 </body>
 
