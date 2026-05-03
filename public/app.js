@@ -863,82 +863,74 @@ async function generateAiRecommendations() {
  * @param {Object} data - Oggetto risposta da /api/ai/recommend
  */
 function renderAiResults(data) {
-  const out     = $('aiOut');
-  const tracks  = (data.recommendations || []).filter(r => r.type === 'track');
-  const artists = (data.recommendations || []).filter(r => r.type === 'artist');
+  const out = $('aiOut');
+  const tracks  = (data.recommendations||[]).filter(r=>r.type==='track');
+  const artists = (data.recommendations||[]).filter(r=>r.type==='artist');
 
-  out.innerHTML = `
+  out.innerHTML=`
     <div class="ai-result">
-      <!-- Header: mood e riepilogo -->
       <div class="ai-header-card">
         <div class="ai-header-top">
-          <div class="ai-mood-pill">🎵 ${esc(data.mood || 'Il tuo vibe')}</div>
-          <button class="ai-regen-btn"
-                  onclick="S.ai.data=null;generateAiRecommendations()">↺ Rigenera</button>
+          <div class="ai-mood-pill">🎵 ${esc(data.mood||'Il tuo vibe')}</div>
+          <button class="ai-regen-btn" onclick="S.ai.data=null;generateAiRecommendations()">↺ Rigenera</button>
         </div>
-        <p class="ai-summary">${esc(data.summary || '')}</p>
-        ${data.playlist_name
-          ? `<div class="ai-pl-suggestion">💿 Playlist suggerita: <strong>"${esc(data.playlist_name)}"</strong></div>`
-          : ''}
+        <p class="ai-summary">${esc(data.summary||'')}</p>
+        ${data.playlist_name?`<div class="ai-pl-suggestion">💿 Playlist suggerita: <strong>"${esc(data.playlist_name)}"</strong></div>`:''}
       </div>
 
-      <!-- Artisti consigliati -->
-      ${artists.length ? `
-        <div class="ai-section">
-          <div class="ai-section-title">👤 Artisti consigliati</div>
-          <div class="ai-artist-grid">
-            ${artists.map(a => `
-              <div class="ai-artist-card">
-                <div class="ai-artist-initial">${esc(a.name[0] || '?')}</div>
-                <div class="ai-artist-name">${esc(a.name)}</div>
-                <div class="ai-artist-reason">${esc(a.reason)}</div>
-              </div>`).join('')}
-          </div>
-        </div>` : ''}
+      ${artists.length?`
+      <div class="ai-section">
+        <div class="ai-section-title">👤 Artisti consigliati</div>
+        <div class="ai-artist-grid">
+          ${artists.map(a=>`
+            <div class="ai-artist-card">
+              <div class="ai-artist-initial">${esc(a.name[0]||'?')}</div>
+              <div class="ai-artist-name">${esc(a.name)}</div>
+              <div class="ai-artist-reason">${esc(a.reason)}</div>
+              <button class="ai-search-spotify" onclick="searchAndNav('${esc(a.name)}')">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                Cerca su Spotify
+              </button>
+            </div>`).join('')}
+        </div>
+      </div>`:''}
 
-      <!-- Brani consigliati -->
-      ${tracks.length ? `
-        <div class="ai-section">
-          <div class="ai-section-title">🎵 Brani consigliati</div>
-          <div class="ai-tracks-list" id="aiTracksList">
-            ${tracks.map((t, i) => `
-              <div class="ai-track-item" id="ait-${i}">
-                <div class="ai-track-num">${i + 1}</div>
-                <!-- Artwork: inizialmente placeholder, aggiornato da loadAiTrackData() -->
-                <div class="ai-track-art" id="ait-art-${i}">
-                  <span class="ai-track-art-ph">♫</span>
-                </div>
-                <div class="ai-track-det">
-                  <div class="ai-track-name">${esc(t.name)}</div>
-                  <div class="ai-track-artist">${esc(t.artist || '')}</div>
-                  <div class="ai-track-reason">${esc(t.reason)}</div>
-                </div>
-                <div class="ai-track-actions">
-                  <!-- Bottone play: cerca l'URI e avvia la riproduzione -->
-                  <button class="ai-play-btn" id="ait-play-${i}"
-                          onclick="aiPlayTrack(${i},'${esc(t.name)}','${esc(t.artist || '')}')">
-                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                  </button>
-                </div>
-              </div>`).join('')}
-          </div>
-
-          <!-- Bottone crea playlist Spotify -->
-          <div class="ai-create-pl-wrap">
-            <button class="ai-create-pl-btn" id="aiCreatePlBtn" onclick="createAiPlaylist()">
-              <svg viewBox="0 0 24 24">
-                <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
-              </svg>
-              Crea Playlist su Spotify
-            </button>
-            <p class="ai-create-pl-note">Creerà una playlist con i brani sopra nel tuo account Spotify</p>
-          </div>
-        </div>` : ''}
+      ${tracks.length?`
+      <div class="ai-section">
+        <div class="ai-section-title">🎵 Brani consigliati</div>
+        <div class="ai-tracks-list" id="aiTracksList">
+          ${tracks.map((t,i)=>`
+            <div class="ai-track-item" id="ait-${i}">
+              <div class="ai-track-num">${i+1}</div>
+              <div class="ai-track-art" id="ait-art-${i}"><span class="ai-track-art-ph">♫</span></div>
+              <div class="ai-track-det">
+                <div class="ai-track-name">${esc(t.name)}</div>
+                <div class="ai-track-artist">${esc(t.artist||'')}</div>
+                <div class="ai-track-reason">${esc(t.reason)}</div>
+              </div>
+              <div class="ai-track-actions">
+                <button class="ai-play-btn" id="ait-play-${i}" onclick="aiPlayTrack(${i},'${esc(t.name)}','${esc(t.artist||'')}')">
+                  <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <button class="ai-search-btn-sm" onclick="searchAndNav('${esc(t.name+' '+t.artist)}')">
+                  <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                </button>
+              </div>
+            </div>`).join('')}
+        </div>
+        <div class="ai-create-pl-wrap">
+          <button class="ai-create-pl-btn" id="aiCreatePlBtn" onclick="createAiPlaylist()">
+            <svg viewBox="0 0 24 24"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
+            Crea Playlist su Spotify
+          </button>
+          <p class="ai-create-pl-note">Creerà una playlist con i brani sopra nel tuo account Spotify</p>
+        </div>
+      </div>`:''}
     </div>`;
 
-  // Avvia il caricamento artwork in background (non blocca il render)
   if (tracks.length) loadAiTrackData(tracks);
 }
+
 
 /**
  * Risolve in background ogni brano AI in un URI Spotify reale.
